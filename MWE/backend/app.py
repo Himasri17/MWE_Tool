@@ -1030,21 +1030,43 @@ def get_pending_users():
     except Exception as e:
         print(f"Error fetching pending users: {e}")
         return jsonify({"error": "Internal server error"}), 500
-    
+ 
+  
 @app.route("/admin/approve-user/<user_id>", methods=["PUT"])
-def approve_user():
-    """Approves a specific user by ID. (UNCHANGED)"""
+def approve_user(user_id):
+    """Approves a specific user by ID."""
     try:
-        # ... (implementation remains the same) ...
-        return jsonify({"message": f"User successfully approved."}), 200
+        data = request.json
+        admin_username = data.get("adminUsername")
+        
+        result = users_collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {
+                "is_approved": True, 
+                "approval_date": datetime.utcnow(),
+                "approved_by": admin_username
+            }}
+        )
+        
+        if result.matched_count == 0:
+            return jsonify({"message": "User not found."}), 404
+        
+        user_doc = users_collection.find_one({"_id": ObjectId(user_id)})
+        
+        # Send approval email to user
+        send_user_approval_email(user_doc, approved=True)
+        
+        log_action_and_update_report(admin_username, f'Approved user account for: {user_doc.get("username", "Unknown User")}.')
+        
+        return jsonify({"message": f"User {user_doc.get('username', 'Unknown User')} successfully approved."}), 200
+        
     except Exception as e:
-        # ... (error handling remains the same) ...
+        print(f"Error approving user: {e}")
         return jsonify({"error": "Internal server error during approval"}), 500
-    
+
 @app.route("/admin/reject-user/<user_id>", methods=["PUT"])
 def reject_user(user_id):
-    """Rejects a specific user by ID (soft delete with is_rejected flag). (UNCHANGED)"""
-    # ... (implementation remains the same) ...
+    """Rejects a specific user by ID (soft delete with is_rejected flag)."""
     try:
         data = request.json
         admin_username = data.get("adminUsername")
@@ -1081,11 +1103,10 @@ def reject_user(user_id):
         print(f"Error rejecting user: {e}")
         return jsonify({"error": f"Internal server error during rejection: {str(e)}"}), 500
 
-# --- Other Routes (UNCHANGED) ---
 
+# --- Other Routes (Unchanged) ---
 @app.route("/check-role", methods=["POST"])
 def check_role():
-    # ... (implementation remains the same) ...
     data = request.json
     username = data.get("username")
     user = users_collection.find_one({"username": username})
@@ -1098,9 +1119,9 @@ def check_role():
         
     return jsonify({"role": user.get("role", "user")})
 
+
 @app.route("/logout", methods=["POST"])
 def logout():
-    # ... (implementation remains the same) ...
     data = request.json
     username = data.get("username")
     log_action_and_update_report(username, 'Logout')
@@ -1108,7 +1129,6 @@ def logout():
 
 @app.route('/api/users-list', methods=['GET'])
 def get_users_list():
-    # ... (implementation remains the same) ...
     try:
         # Get only approved non-admin users
         users = users_collection.find({
@@ -1121,10 +1141,10 @@ def get_users_list():
     except Exception as e:
         print(f"Error fetching users: {e}")
         return jsonify({"error": "Internal server error"}), 500
-    
+   
+   
 @app.route("/api/user/<username>", methods=["GET"])
 def get_user_data(username):
-    # ... (implementation remains the same) ...
     try:
         user = users_collection.find_one(
             {"username": username}, 
