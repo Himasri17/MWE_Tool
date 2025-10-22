@@ -18,7 +18,7 @@ import {
   Folder as ProjectIcon,
   Timeline as TimelineIcon
 } from '@mui/icons-material';
-import NetworkGraph from '../pages/NetworkGraph';
+import NetworkGraph from './NetworkGraph';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 

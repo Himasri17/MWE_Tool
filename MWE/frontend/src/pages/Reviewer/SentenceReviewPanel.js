@@ -41,7 +41,6 @@ export default function SentenceReviewPanel() {
     const handleCloseSnackbar = () => { 
         setSnackbar({ ...snackbar, open: false });
     };
-
     
     
     // --- Data Fetching (Using useCallback) ---

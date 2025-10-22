@@ -10,7 +10,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import FeedbackIcon from '@mui/icons-material/Feedback'; 
 
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
-import FeedbackDialog from '../pages/FeedbackDialog'; 
+import FeedbackDialog from './FeedbackDialog'; 
 
 
 

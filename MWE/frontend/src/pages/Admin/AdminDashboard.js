@@ -20,11 +20,11 @@ import FeedbackIcon from '@mui/icons-material/Feedback';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead'; 
 import CloseIcon from '@mui/icons-material/Close';
-import CreateProjectModal from '../pages/Createprojectmodal';
-import AssignUsersDialog from '../pages/AssignUsersDialog';
-import EditProjectModal from '../pages/EditProjectModal';
-import ContactUsDialog from '../pages/ContactUsDialog';
-import TermsDialog from '../pages/TermsDialog';
+import CreateProjectModal from './Createprojectmodal';
+import AssignUsersDialog from './AssignUsersDialog';
+import EditProjectModal from './EditProjectModal';
+import ContactUsDialog from '../User Authentication/ContactUsDialog';
+import TermsDialog from '../User Authentication/TermsDialog';
 
 export default function AdminDashboard() {
     const { username } = useParams();
