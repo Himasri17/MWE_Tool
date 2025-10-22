@@ -516,21 +516,24 @@ def update_sentence_review_status(sentence_id):
             "source_sentence_id": sentence_id
         })
         
-        # Check if sentence has been manually approved without tags
+        # Get current sentence
         sentence = sentences_collection.find_one({"_id": ObjectId(sentence_id)})
-        current_status = sentence.get('review_status', 'Pending') if sentence else 'Pending'
+        if not sentence:
+            return
+            
+        current_status = sentence.get('review_status', 'Pending')
         
-        # If already manually approved, keep that status
-        if current_status == 'Approved' and approved_tags_count == 0 and remaining_staged_tags == 0:
-            # This is a manually approved sentence without tags - keep it approved
-            new_status = "Approved"
-            is_annotated = True
-        elif remaining_staged_tags > 0:
-            # Still has pending tags
+        # NEW LOGIC: Determine the correct status
+        if remaining_staged_tags > 0:
+            # Still has pending tags - keep as Pending
             new_status = "Pending"
             is_annotated = True
         elif approved_tags_count > 0:
             # All tags processed and at least one approved
+            new_status = "Approved"
+            is_annotated = True
+        elif current_status == "Approved" and approved_tags_count == 0 and remaining_staged_tags == 0:
+            # Manually approved sentence without tags - keep approved
             new_status = "Approved"
             is_annotated = True
         else:
@@ -547,9 +550,11 @@ def update_sentence_review_status(sentence_id):
             }}
         )
         
+        print(f"Updated sentence {sentence_id} status: {new_status} (approved: {approved_tags_count}, pending: {remaining_staged_tags})")
+        
     except Exception as e:
         print(f"Error updating sentence status: {e}")
-            
+                   
 # --- API Routes ---
 
 @app.route("/register", methods=["POST"])
@@ -2910,15 +2915,27 @@ def approve_tag(tag_id):
         if not staged_tag:
             return jsonify({"message": "Staged tag not found or already reviewed."}), 404
         
-        final_tag = staged_tag
-        final_tag.pop('_id') 
+        # Create final tag with updated status
+        final_tag = {
+            'tag': staged_tag.get('tag'),
+            'source_sentence_id': staged_tag.get('source_sentence_id'),
+            'username': staged_tag.get('username'),
+            'text': staged_tag.get('text'),
+            'annotation_date': staged_tag.get('annotation_date'),
+            'review_status': 'Approved',  
+            'review_comments': request.json.get('comments', ''),
+            'reviewed_by': request.json.get('reviewerUsername'),
+            'reviewed_at': datetime.utcnow()
+        }
         
+        # Insert into final collections
         tags_collection.insert_one(final_tag)
-        search_tags_collection.insert_one(final_tag) 
+        search_tags_collection.insert_one(final_tag)
         
+        # Remove from staged collection
         staged_tags_collection.delete_one({"_id": ObjectId(tag_id)})
         
-        # NEW: Update sentence status
+        # Update sentence status
         update_sentence_review_status(final_tag.get('source_sentence_id'))
         
         log_action_and_update_report(request.json.get('reviewerUsername', 'system'), 
@@ -2928,7 +2945,7 @@ def approve_tag(tag_id):
     except Exception as e:
         print(f"Error approving tag: {e}")
         return jsonify({"error": "Internal server error during tag approval."}), 500
-
+    
 @app.route('/reviewer/tag/<tag_id>/reject', methods=['DELETE'])
 def reject_tag(tag_id):
     try:
