@@ -143,20 +143,23 @@ export default function SentenceReviewPanel() {
     const updateSentenceStatus = useCallback((sentenceId) => {
         setSentences(prevSentences => prevSentences.map(s => {
             if (s._id === sentenceId) {
-                const hasPendingTags = s.tags.some(tag => tag.review_status === 'Pending');
-                const hasApprovedTags = s.tags.some(tag => tag.review_status === 'Approved');
+                const pendingTags = s.tags.filter(tag => tag.review_status === 'Pending');
+                const approvedTags = s.tags.filter(tag => tag.review_status === 'Approved');
                 
                 let newReviewStatus = 'Pending';
                 let newIsAnnotated = false;
                 
-                if (hasPendingTags) {
+                if (pendingTags.length > 0) {
                     newReviewStatus = 'Pending';
                     newIsAnnotated = true;
-                } else if (hasApprovedTags) {
+                } else if (approvedTags.length > 0) {
+                    newReviewStatus = 'Approved';
+                    newIsAnnotated = true;
+                } else if (s.review_status === 'Approved' && s.tags.length === 0) {
+                    // Manually approved sentence without tags
                     newReviewStatus = 'Approved';
                     newIsAnnotated = true;
                 } else {
-                    // No tags or all tags rejected
                     newReviewStatus = 'Rejected';
                     newIsAnnotated = false;
                 }
@@ -338,7 +341,7 @@ export default function SentenceReviewPanel() {
                     ) : (
                         <Box sx={{maxHeight: '30vh', overflowY: 'auto', pr: 1, mb: 2}}>
                             {sentenceData.tags.map((tag, index) => {
-                                const tagIsPending = tag.review_status === 'Pending';
+                                const tagIsPending = tag.review_status === 'Pending' || tag.review_status === 'Staged/Pending Review';
                                 const tagId = tag._id;
                                 const currentComment = tagComments[tagId] || tag.review_comments || '';
 
@@ -349,14 +352,27 @@ export default function SentenceReviewPanel() {
                                             <Box>
                                                 <Typography variant="body1" fontWeight="bold">
                                                     {tag.text} 
-                                                    <Chip label={tag.tag} size="small" color={tagIsPending ? 'warning' : 'success'} sx={{ ml: 1, height: 20, fontSize: '0.75rem' }} />
+                                                    <Chip 
+                                                        label={tag.tag} 
+                                                        size="small" 
+                                                        color={tagIsPending ? 'warning' : 'success'} 
+                                                        sx={{ ml: 1, height: 20, fontSize: '0.75rem' }} 
+                                                    />
+                                                    {/* Show the actual status */}
+                                                    <Chip 
+                                                        label={tag.review_status} 
+                                                        size="small" 
+                                                        variant="outlined"
+                                                        sx={{ ml: 0.5, height: 20, fontSize: '0.7rem' }} 
+                                                    />
                                                 </Typography>
                                                 <Typography variant="caption" color="text.secondary">
-                                                    By: {tag.username} | Status: <span style={{ color: tagIsPending ? theme.palette.warning.dark : theme.palette.success.dark }}>{tag.review_status}</span>
+                                                    By: {tag.username} | Annotated: {tag.annotation_date ? new Date(tag.annotation_date).toLocaleDateString() : 'N/A'}
+                                                    {tag.reviewed_by && ` | Reviewed by: ${tag.reviewed_by}`}
                                                 </Typography>
                                             </Box>
                                             
-                                            {/* PER-TAG ACTION BUTTONS */}
+                                            {/* Action buttons */}
                                             <Box sx={{ display: 'flex', gap: 1 }}>
                                                 {tagIsPending ? (
                                                     <>
@@ -387,7 +403,7 @@ export default function SentenceReviewPanel() {
                                             </Box>
                                         </Box>
 
-                                        {/* TAG-SPECIFIC COMMENT FIELD */}
+                                        {/* Comment field */}
                                         {(tagIsPending || (tag.review_comments && tag.review_comments.length > 0)) && (
                                             <TextField
                                                 fullWidth
