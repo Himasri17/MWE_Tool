@@ -15,7 +15,7 @@ import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
 // IMPORT NEW COMPONENT
-import ContactUsDialog from '../pages/ContactUsDialog'; 
+import ContactUsDialog from '../User/ContactUsDialog'; 
 
 export default function Register() {
     // --- State Management ---

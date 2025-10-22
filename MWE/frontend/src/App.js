@@ -1,16 +1,16 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
-import AdminDashboard from "./pages/AdminDashboard";
-import ProjectSentencesReview from "./pages/ProjectSentencesReview"; 
-import AdminApprovalList from "./pages/AdminApprovalList";
-import AnalyticsDashboard from "./pages/AnalyticsDashboard"; 
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import ReviewerDashboard from './pages/ReviewerDashboard';
-import SentenceReviewPanel from './pages/SentenceReviewPanel';
+import Login from "./pages/User Authentication/Login";
+import Register from "./pages/User Authentication/Register";
+import Dashboard from "./pages/User/Dashboard";
+import AdminDashboard from "./pages/Admin/AdminDashboard";
+import ProjectSentencesReview from "./pages/Admin/ProjectSentencesReview"; 
+import AdminApprovalList from "./pages/Admin/AdminApprovalList";
+import AnalyticsDashboard from "./pages/Admin/AnalyticsDashboard"; 
+import ForgotPassword from "./pages/User Authentication/ForgotPassword";
+import ResetPassword from "./pages/User Authentication/ResetPassword";
+import ReviewerDashboard from './pages/Reviewer/ReviewerDashboard';
+import SentenceReviewPanel from './pages/Reviewer/SentenceReviewPanel';
 
 function App() {
     return (

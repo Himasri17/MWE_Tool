@@ -2606,8 +2606,7 @@ def update_project(project_id):
 @app.route("/api/projects/<project_id>/sentences", methods=["GET"])
 def get_project_sentences(project_id):
     """
-    FIXED: Fetches sentences and their tags for a specific project ID and user (Admin Review).
-    Uses proper aggregation to join sentences with tags.
+    Fetches sentences and their tags (BOTH final and staged) for a specific project ID and user.
     """
     try:
         project_name = "Unknown Project"
@@ -2624,33 +2623,72 @@ def get_project_sentences(project_id):
             
         print(f"DEBUG: Fetching sentences for project {project_id}, user {target_username}")
             
-        # FIXED: Use proper ObjectId conversion for lookup
+        # Fetch sentences with their FINAL tags
         pipeline = [
             {"$match": {
                 "project_id": project_id, 
                 "username": target_username
             }},
-            # Convert _id to string for proper joining with tags
             {"$addFields": {
                 "sentence_id_str": {"$toString": "$_id"}
             }},
-            # Lookup tags using the string version of sentence ID
             {"$lookup": {
                 "from": "tags",
                 "localField": "sentence_id_str",
                 "foreignField": "source_sentence_id", 
-                "as": "tags"
+                "as": "final_tags"
             }},
             {"$sort": {"original_index": 1}}
         ]
-        
-        print(f"DEBUG: Pipeline: {pipeline}")
         
         project_sentences = []
         cursor = sentences_collection.aggregate(pipeline)
         
         for s in cursor:
-            print(f"DEBUG: Processing sentence: {s.get('_id')}")
+            sentence_id_str = str(s["_id"])
+            
+            # Fetch STAGED tags for this sentence using your existing route logic
+            staged_tags = list(staged_tags_collection.find({
+                "source_sentence_id": sentence_id_str  # Note: using source_sentence_id, not sentence_id
+            }))
+            
+            # Combine final tags and staged tags
+            all_tags = []
+            
+            # Process final tags
+            for tag in s.get("final_tags", []):
+                tag_data = {
+                    "text": tag.get("text", ""),
+                    "tag": tag.get("tag", ""),
+                    "username": tag.get("username", ""),
+                    "annotation_date": tag.get("annotation_date"),
+                    "mweId": tag.get("mweId"),
+                    "_id": str(tag["_id"]),
+                    "review_status": "Approved",  # Final tags are approved
+                    "review_comments": tag.get("review_comments", "")
+                }
+                # Format date if present
+                if tag_data["annotation_date"] and isinstance(tag_data["annotation_date"], datetime):
+                    tag_data["annotated_on"] = tag_data["annotation_date"].strftime('%Y-%m-%d')
+                all_tags.append(tag_data)
+            
+            # Process staged tags
+            for tag in staged_tags:
+                tag_data = {
+                    "text": tag.get("text", ""),
+                    "tag": tag.get("tag", ""),
+                    "username": tag.get("username", ""),
+                    "annotation_date": tag.get("annotation_date"),
+                    "mweId": tag.get("mweId"),
+                    "_id": str(tag["_id"]),
+                    "review_status": "Pending",  # Staged tags are pending
+                    "review_comments": tag.get("review_comments", "")
+                }
+                # Format date if present
+                if tag_data["annotation_date"] and isinstance(tag_data["annotation_date"], datetime):
+                    tag_data["annotated_on"] = tag_data["annotation_date"].strftime('%Y-%m-%d')
+                all_tags.append(tag_data)
+            
             # Convert MongoDB document to JSON-serializable format
             sentence_data = {
                 "_id": str(s["_id"]),
@@ -2661,27 +2699,13 @@ def get_project_sentences(project_id):
                 "username": s.get("username"),
                 "annotation_datetime": s.get("annotation_datetime"),
                 "annotation_email": s.get("annotation_email"),
-                "tags": []
+                "tags": all_tags,  # Now includes both final and staged tags
+                "review_status": s.get("review_status", "Pending")
             }
-            
-            # Process tags
-            for tag in s.get("tags", []):
-                tag_data = {
-                    "text": tag.get("text", ""),
-                    "tag": tag.get("tag", ""),
-                    "annotated_by": tag.get("username", ""),
-                    "annotation_date": tag.get("annotation_date"),
-                    "mweId": tag.get("mweId"),
-                    "_id": str(tag["_id"])
-                }
-                # Format date if present
-                if tag_data["annotation_date"] and isinstance(tag_data["annotation_date"], datetime):
-                    tag_data["annotated_on"] = tag_data["annotation_date"].strftime('%Y-%m-%d')
-                sentence_data["tags"].append(tag_data)
             
             project_sentences.append(sentence_data)
             
-        print(f"DEBUG: Found {len(project_sentences)} sentences")
+        print(f"DEBUG: Found {len(project_sentences)} sentences with {sum(len(s['tags']) for s in project_sentences)} total tags")
             
         return jsonify({
             "project_name": project_name,
@@ -2693,7 +2717,6 @@ def get_project_sentences(project_id):
         import traceback
         traceback.print_exc()
         return jsonify({"error": f"Internal server error while fetching sentences: {str(e)}"}), 500
-   
           
 @app.route('/api/activity-logs/<username>', methods=["GET"])
 def get_activity_logs(username):

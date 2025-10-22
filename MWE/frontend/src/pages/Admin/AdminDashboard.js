@@ -23,7 +23,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import CreateProjectModal from './Createprojectmodal';
 import AssignUsersDialog from './AssignUsersDialog';
 import EditProjectModal from './EditProjectModal';
-import ContactUsDialog from '../User Authentication/ContactUsDialog';
+import ContactUsDialog from '../User/ContactUsDialog';
 import TermsDialog from '../User Authentication/TermsDialog';
 
 export default function AdminDashboard() {
