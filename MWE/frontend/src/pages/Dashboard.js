@@ -1,0 +1,770 @@
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+    Container, Typography, TextField, Button, Box, List, ListItem, ListItemText,
+    Paper, Dialog, DialogActions, DialogContent,
+    DialogContentText, DialogTitle, Chip, CircularProgress, 
+    Grid, LinearProgress, Card, CardContent ,FormControl, InputLabel, Select, MenuItem 
+} from "@mui/material";
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import FeedbackIcon from '@mui/icons-material/Feedback'; 
+
+import FolderOpenIcon from '@mui/icons-material/FolderOpen';
+import FeedbackDialog from '../pages/FeedbackDialog'; 
+
+
+
+export default function Dashboard() {
+    const { username } = useParams();
+    const navigate = useNavigate();
+
+    // --- State Management ---
+    const [userData, setUserData] = useState(null);
+
+    const [projectTasks, setProjectTasks] = useState([]);
+    const [allSentences, setAllSentences] = useState([]);        // Stores all sentences for the currently selected project/group
+    const [visibleSentences, setVisibleSentences] = useState([]); // The list currently visible in the UI (post-filter)
+    
+    const [tags, setTags] = useState([]);
+    const [selectedSentence, setSelectedSentence] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [autoTags, setAutoTags] = useState([]);
+    const [newSelection, setNewSelection] = useState({ isActive: false, text: '', tag: '' });
+    const [editingSentence, setEditingSentence] = useState({ isActive: false, _id: null, textContent: '' });
+    const [editingTag, setEditingTag] = useState({ isActive: false, _id: null, text: '', tag: '' });
+    const [deleteConfirmation, setDeleteConfirmation] = useState({ isOpen: false, sentenceId: null });
+    const [bulkUploadDialog, setBulkUploadDialog] = useState(false);
+    const [file, setFile] = useState(null);
+    const [bulkTag, setBulkTag] = useState('');
+    const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+    
+    // --- SEARCH & TAG MATCH STATES ---
+    const [searchTerm, setSearchTerm] = useState('');
+    const [matchedTag, setMatchedTag] = useState(null); // Stores the tag object if the search term is an an exact tag match
+    const PREDEFINED_TAGS = [
+    "Noun Compound",
+    "Reduplicated", 
+    "Echo",
+    "Opaque",
+    "Opaque-Idiom"
+    ];
+    // -------------------------------------
+
+    // --- PROJECT STATES ---
+    const [selectedProject, setSelectedProject] = useState(null); 
+    const [projectName, setProjectName] = useState(""); 
+    // --------------------------
+
+    // --- Ref for scroll control ---
+    const listRef = useRef(null);
+    const isInitialLoad = useRef(true);
+
+    // --- API Data Fetching ---
+    const fetchTags = useCallback(async () => {
+        try {
+            const res = await fetch(`http://127.0.0.1:5001/tags/${username}`);
+            if (!res.ok) throw new Error("Failed to fetch tags");
+            setTags(await res.json());
+        } catch (err) { console.error(err); }
+    }, [username]);
+
+    // CORE LOADER: Fetches all data and initializes the view
+    const loadAllUserTasks = useCallback(async (setLoading = true) => {
+    if (setLoading) setIsLoading(true);
+    try {
+        const res = await fetch(`http://127.0.0.1:5001/sentences/${username}`);
+        if (!res.ok) throw new Error("Failed to fetch all user tasks.");
+        const data = await res.json();
+        
+        const projects = data.project_tasks || [];
+        
+        setProjectTasks(projects);
+        
+        // 2. Determine initial view (Project is prioritized)
+        let initialProject = null;
+        if (projects.length > 0) {
+            // A. Try to find the first project with REMAINING tasks
+            initialProject = projects.find(p => p.completed < p.total);
+            
+            // B. CRITICAL FIX: If no incomplete project is found, select the very first one (projects[0]).
+            if (!initialProject) {
+                initialProject = projects[0]; 
+            }
+        }
+
+        // 3. Set initial visibility based on selection
+        if (initialProject) {
+            setSelectedProject(initialProject);
+            setProjectName(initialProject.project_name);
+            setAllSentences(initialProject.sentences || []); 
+            // setVisibleSentences is handled by the filtering useEffect
+        } else {
+            setSelectedProject(null);
+            setProjectName(projects.length > 0 ? "No Unfinished Tasks Selected" : "No Assigned Projects");
+            setAllSentences([]); 
+            setVisibleSentences([]); 
+        }
+        
+        setSelectedSentence(null); 
+        setSearchTerm(''); 
+        
+    } catch (err) { 
+        console.error("Error loading user tasks:", err); 
+        setProjectTasks([]);
+        setAllSentences([]);
+        setVisibleSentences([]);
+    } finally {
+        if (setLoading) setIsLoading(false);
+    }
+}, [username]);
+
+    useEffect(() => {
+        const loadData = async () => {
+            await fetchTags();
+            await loadAllUserTasks();
+        };
+        loadData();
+    }, [fetchTags, loadAllUserTasks]);
+
+    useEffect(() => {
+        const fetchUserData = async () => {
+            try {
+                // You might need to create this endpoint in your backend
+                const res = await fetch(`http://127.0.0.1:5001/api/user/${username}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setUserData(data);
+                }
+            } catch (err) {
+                console.error("Error fetching user data:", err);
+            }
+        };
+        
+        if (username) {
+            fetchUserData();
+        }
+    }, [username]);
+
+
+    // --- UPDATED: Search Filtering Effect (Handles Sentence and Tag Match) ---
+    useEffect(() => {
+        const normalizedSearchTerm = searchTerm.toLowerCase().trim();
+
+        if (normalizedSearchTerm === '') {
+            setVisibleSentences(allSentences);
+            setMatchedTag(null); 
+            return;
+        }
+
+        // 1. Find if the search term matches any tag (text or label) globally
+        const foundTag = tags.find(tag => 
+            tag.text.toLowerCase() === normalizedSearchTerm || 
+            tag.tag.toLowerCase() === normalizedSearchTerm
+        );
+        
+        setMatchedTag(foundTag || null);
+        setSelectedSentence(null); // Clear selected sentence when a search is active
+
+        // 2. Filter sentences based on content or associated tag
+        const filtered = allSentences.filter(sentence => {
+            const textMatch = sentence.textContent.toLowerCase().includes(normalizedSearchTerm);
+
+            const sentenceTags = tags.filter(t => t.source_sentence_id === sentence._id);
+            const tagMatch = sentenceTags.some(tag => 
+                tag.text.toLowerCase().includes(normalizedSearchTerm) || 
+                tag.tag.toLowerCase().includes(normalizedSearchTerm)
+            );
+            
+            return textMatch || tagMatch;
+        });
+
+        setVisibleSentences(filtered);
+    }, [searchTerm, allSentences, tags]);
+    
+    // Scroll to first unannotated sentence only on initial load
+    useEffect(() => {
+        if (isLoading || visibleSentences.length === 0 || !listRef.current || !isInitialLoad.current || searchTerm.length > 0) return;
+
+        const firstUnannotatedIndex = visibleSentences.findIndex(s => !s.is_annotated);
+        if (firstUnannotatedIndex !== -1) {
+            const targetElement = listRef.current.children[firstUnannotatedIndex];
+            if (targetElement) {
+                const listContainer = listRef.current;
+                const offsetTop = targetElement.offsetTop;
+                listContainer.scrollTop = offsetTop;
+            }
+        }
+        isInitialLoad.current = false;
+    }, [isLoading, visibleSentences, searchTerm]);
+    
+    // --- Auto-Tag Detection (Works on selected sentence) ---
+    useEffect(() => {
+        if (!selectedSentence || !tags.length) {
+            setAutoTags([]);
+            return;
+        }
+        const uniqueTagTexts = [...new Set(tags.map(t => t.text.toLowerCase()))];
+        const foundTags = [];
+        uniqueTagTexts.forEach(tagText => {
+            const regex = new RegExp(`\\b${tagText}\\b`, 'i');
+            if (regex.test(selectedSentence.textContent)) {
+                const originalTag = tags.find(t => t.text.toLowerCase() === tagText);
+                if (originalTag) {
+                    foundTags.push({ text: originalTag.text, tag: originalTag.tag });
+                }
+            }
+        });
+        setAutoTags(foundTags);
+    }, [selectedSentence, tags]);
+
+    // --- Event Handlers ---
+    
+    const handleSearchChange = (event) => {
+        setSearchTerm(event.target.value);
+    };
+
+    const handleSelectProject = (project) => {
+        setSelectedProject(project);
+        setSelectedSentence(null);
+        setNewSelection({ isActive: false, text: '', tag: '' });
+        setEditingTag({ isActive: false, _id: null, text: '', tag: '' });
+        setSearchTerm(''); // Clear search on project switch
+        setMatchedTag(null); // Clear tag match on project switch
+        isInitialLoad.current = true;
+        
+        if (project === null) {
+            setAllSentences([]);
+            setVisibleSentences([]);
+            setProjectName("No Project Selected");
+        } else {
+            const fullProject = projectTasks.find(p => p.project_name === project.project_name);
+            if (fullProject) {
+                setAllSentences(fullProject.sentences);
+                setVisibleSentences(fullProject.sentences);
+                setProjectName(fullProject.project_name);
+            }
+        }
+    };
+
+    
+
+    const handleSelectionEvent = (sentence) => {
+        const highlightedText = window.getSelection().toString().trim();
+        setSelectedSentence(sentence);
+        setEditingTag({ isActive: false, _id: null, text: '', tag: '' });
+
+        if (highlightedText.length > 0 && !editingSentence.isActive) {
+            let suggestion = "Noun Compound"; // Default to first option
+            const lowerCaseText = highlightedText.toLowerCase();
+            const existingTag = tags.find(t => t.text.toLowerCase() === lowerCaseText);
+
+            if (existingTag) {
+            suggestion = existingTag.tag;
+            } else {
+            // Use your custom logic here if needed, or keep the default
+            // For now, we'll just use "Noun Compound" as default
+            }
+            setNewSelection({ isActive: true, text: highlightedText, tag: suggestion });
+        } else {
+            setNewSelection({ isActive: false, text: '', tag: '' });
+        }
+        };
+
+    const handleSaveNewTag = async () => {
+        if (!selectedSentence || !newSelection.text.trim() || !newSelection.tag.trim()) {
+            return alert("Please provide both text and a tag label.");
+        }
+        await fetch(`http://127.0.0.1:5001/tags`, {
+            method: 'POST',
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                username,
+                text: newSelection.text.trim(),
+                tag: newSelection.tag.trim(),
+                sentenceId: selectedSentence._id
+            }),
+        });
+        await fetchTags();
+        setNewSelection({ isActive: false, text: '', tag: '' });
+    };
+
+    const handleStartEditTag = (tag) => {
+        setEditingTag({ isActive: true, _id: tag._id, text: tag.text, tag: tag.tag });
+        setNewSelection({ isActive: false, text: '', tag: '' });
+    };
+
+    const handleRemoveTag = async (tagId) => {
+        if (!selectedSentence) return;
+        await fetch(`http://127.0.0.1:5001/sentences/${selectedSentence._id}/tags/${tagId}`, { method: 'DELETE' });
+        await fetchTags();
+    };
+
+    const handleUpdateTag = async () => {
+        if (!editingTag._id) return;
+
+        // Local update for snappier UI
+        setTags(prevTags =>
+            prevTags.map(tag =>
+                tag._id === editingTag._id
+                    ? { ...tag, text: editingTag.text, tag: editingTag.tag }
+                    : tag
+            )
+        );
+
+        try {
+            // Re-use the POST endpoint for updating the tag content (it works as an upsert/update).
+            await fetch(`http://127.0.0.1:5001/tags`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username,
+                    text: editingTag.text.trim(),
+                    tag: editingTag.tag.trim(),
+                    sentenceId: selectedSentence._id 
+                })
+            });
+        } catch (err) {
+            console.error("Error updating tag:", err);
+        }
+
+        setEditingTag({ isActive: false, _id: null, text: '', tag: '' });
+    };
+
+    const handleStatusChange = async (isAnnotated) => {
+    if (!selectedSentence) return;
+
+    // Optimistic UI Update (keep this)
+    const updatedAllSentences = allSentences.map(s =>
+        s._id === selectedSentence._id ? { ...s, is_annotated: isAnnotated } : s
+    );
+    setAllSentences(updatedAllSentences);
+    setSelectedSentence({ ...selectedSentence, is_annotated: isAnnotated });
+
+    try {
+        const response = await fetch(`http://127.0.0.1:5001/sentences/${selectedSentence._id}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_annotated: isAnnotated, username }),
+        });
+
+        if (!response.ok) {
+            // Log status and attempt to read JSON error body for better diagnosis
+            const errorBody = await response.json().catch(() => ({ error: 'No JSON body available' }));
+            
+            // CRITICAL DEBUG OUTPUT
+            console.error(`Status Update Failed: ${response.status}`, errorBody);
+            
+            throw new Error(errorBody.error || `Server Error (${response.status})`);
+        }
+        
+        // Success: reload tasks to update metrics
+        await loadAllUserTasks(false); 
+
+    } catch (err) {
+        console.error("Final Error in Status Update:", err);
+        alert(`Failed to update status. Reason: ${err.message}. Check console.`);
+        
+        // Revert UI changes and fetch correct data state if update failed
+        await loadAllUserTasks(false);
+    }
+};
+
+    const handleLogout = async () => {
+        await fetch('http://127.0.0.1:5001/logout', {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username }),
+        });
+        isInitialLoad.current = true;
+        navigate("/");
+    };
+
+    const handleFeedbackClose = (success = false) => {
+        setIsFeedbackOpen(false);
+        if (success) {
+            // Optionally show success notification here
+            console.log("Feedback submission acknowledged.");
+        }
+    };
+
+    // --- Counters ---
+    const totalSentences = allSentences.length;
+    const annotatedCount = allSentences.filter(s => s.is_annotated).length;
+    const remainingCount = totalSentences - annotatedCount;
+    const progressPercent = totalSentences > 0 ? Math.round((annotatedCount / totalSentences) * 100) : 0;
+    
+    const getProjectCardColor = (isPending) => isPending ? '#ffcdd2' : '#c8e6c9';
+
+    const currentSentenceTags = selectedSentence 
+        ? tags.filter(tag => tag.source_sentence_id === selectedSentence._id && tag.username === username) 
+        : [];
+    
+        const renderHeaderBar = () => (
+            <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                py: 2, 
+                px: 4, 
+                bgcolor: '#e3f2fd', 
+                borderBottom: '1px solid #ddd' 
+            }}>
+                <Typography variant="h5" fontWeight="bold">
+                    MWE Annotator - {userData?.full_name || username || "User"}
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                    {/* User Guidelines Button */}
+                    <Button 
+                        variant="outlined" 
+                        onClick={() => window.open('/MWE Tool - User Guidelines.pdf', '_blank')}
+                        color="primary"
+                        sx={{ 
+                            color: 'black', 
+                            borderColor: 'black',
+                            '&:hover': {
+                                backgroundColor: '#e3f2fd',
+                                borderColor: 'black'
+                            }
+                        }}
+                    >
+                        SHOW USER GUIDELINES
+                    </Button>
+                    
+                    {/* Annotation Guidelines Button */}
+                    <Button 
+                        variant="outlined" 
+                        onClick={() => window.open('/MWE_Guidelines.pdf', '_blank')}
+                        color="primary"
+                        sx={{ 
+                            color: 'black', 
+                            borderColor: 'black',
+                            '&:hover': {
+                                backgroundColor: '#e3f2fd',
+                                borderColor: 'black'
+                            }
+                        }}
+                    >
+                        SHOW ANNOTATION GUIDELINES
+                    </Button>
+                    
+                    <Button 
+                        variant="outlined" 
+                        startIcon={<FeedbackIcon />}
+                        onClick={() => setIsFeedbackOpen(true)}
+                        color="primary"
+                    >
+                        Give Feedback
+                    </Button>
+                    <Button 
+                        variant="contained" 
+                        color="secondary" 
+                        onClick={handleLogout}
+                    >
+                        Logout
+                    </Button>
+                </Box>
+            </Box>
+        );
+    // --- Render Logic ---
+
+    return (
+        <Container maxWidth="xl" sx={{ overflow: 'hidden', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+            {renderHeaderBar()}
+            <Paper elevation={3} sx={{ p: 4, mt: 4, mb: 4, maxHeight: '90vh', overflow: 'hidden' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h4" gutterBottom sx={{ mb: 0 }}>Welcome, {userData?.full_name || username || "User"}</Typography>
+                   
+                </Box>
+                
+                {/* --- Project Selector --- */}
+                <Box sx={{ mb: 4 }}>
+                    <Typography variant="h6" gutterBottom>Assigned Tasks</Typography>
+                    <Grid container spacing={2}>
+                        {projectTasks.length === 0 ? (
+                             <Grid item xs={12}>
+                                 <Typography color="text.secondary" sx={{ p: 2 }}>
+                                     You have no assigned projects. Please contact your administrator.
+                                 </Typography>
+                             </Grid>
+                        ) : (
+                            projectTasks.map(project => {
+                                const isPending = project.completed < project.total;
+                                const progress = project.total > 0 ? Math.round((project.completed / project.total) * 100) : 0;
+
+                                return (
+                                    <Grid item xs={12} sm={6} md={3} key={project.project_name}>
+                                        <Card 
+                                            onClick={() => handleSelectProject(project)} 
+                                            sx={{ 
+                                                cursor: 'pointer', 
+                                                border: selectedProject?.project_name === project.project_name ? '2px solid #1976d2' : '1px solid #ddd',
+                                                backgroundColor: getProjectCardColor(isPending),
+                                                height: '100%',
+                                            }}
+                                        >
+                                            <CardContent sx={{ p: 1.5 }}>
+                                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                                                    <FolderOpenIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+                                                    {project.project_name}
+                                                </Typography>
+                                                <Typography variant="caption" display="block" color="text.secondary">
+                                                    {project.completed}/{project.total} done
+                                                </Typography>
+                                                <LinearProgress 
+                                                    variant="determinate" 
+                                                    value={progress} 
+                                                    sx={{ height: 6, borderRadius: 5, mt: 0.5 }} 
+                                                    color={progress === 100 ? 'success' : 'primary'}
+                                                />
+                                            </CardContent>
+                                        </Card>
+                                    </Grid>
+                                )
+                            })
+                        )}
+                    </Grid>
+                </Box>
+
+                {/* --- SEARCH BAR INTEGRATION --- */}
+                <Box sx={{ mb: 3 }}>
+                    <TextField
+                        fullWidth
+                        label="Search Sentence Content or Tags (e.g., 'heart', 'Action/Verb')"
+                        variant="outlined"
+                        value={searchTerm}
+                        onChange={handleSearchChange}
+                    />
+                </Box>
+                {/* ------------------------------ */}
+    
+                <Box sx={{ display: 'flex', gap: 3, mt: 2, maxHeight: '60vh', overflow: 'hidden' }}>
+                    <Box sx={{ width: '45%', display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
+                        <Typography variant="h6" gutterBottom>Subject knowledge Sentences</Typography>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                            <Typography variant="subtitle2">Total: {totalSentences}</Typography>
+                            <Typography variant="subtitle2" color="success.main">Annotated: {annotatedCount}</Typography>
+                            <Typography variant="subtitle2" color="error.main">Remaining: {remainingCount}</Typography>
+                            <Typography variant="subtitle2">Progress: {progressPercent}%</Typography>
+                        </Box>
+                        <List
+                            ref={listRef}
+                            sx={{
+                                maxHeight: '50vh',
+                                overflowY: 'auto',
+                                border: '1px solid #ddd',
+                                borderRadius: '4px',
+                                p: 1
+                            }}
+                        >
+                            {isLoading ? (
+                                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                                    <CircularProgress />
+                                </Box>
+                            ) : visibleSentences.length === 0 && totalSentences > 0 ? (
+                                <Box sx={{ p: 2 }}>
+                                    <Typography color="text.secondary">No sentences match your search term.</Typography>
+                                </Box>
+                            ) : totalSentences === 0 ? (
+                                <Box sx={{ p: 2 }}>
+                                    <Typography color="text.secondary">Select a project to view tasks, or contact your admin if no projects are shown above.</Typography>
+                                </Box>
+                            ) : (
+                                visibleSentences.map((s) => (
+                                    <ListItem
+                                        key={s._id} divider button
+                                        selected={selectedSentence && selectedSentence._id === s._id}
+                                        onMouseUp={() => handleSelectionEvent(s)}
+                                        sx={{
+                                            opacity: s.is_annotated ? 0.6 : 1,
+                                            borderRadius: '4px', mb: 0.5,
+                                            '&:hover .sentence-actions': { visibility: 'visible' }
+                                        }}
+                                    >
+                                        <ListItemText
+                                            primary={`${allSentences.findIndex(item => item._id === s._id) + 1}. ${s.textContent}`}
+                                            primaryTypographyProps={{ sx: { fontStyle: s.is_annotated ? 'italic' : 'normal' } }}
+                                        />
+                                        <Box className="sentence-actions" sx={{ visibility: 'hidden', ml: 1, flexShrink: 0 }}>
+                                            {/* Delete button removed */}
+                                        </Box>
+                                    </ListItem>
+                                ))
+                            )}
+                        </List>
+                    </Box>
+                    <Box sx={{ width: '55%', display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
+                        <Typography variant="h6" gutterBottom>Editor</Typography>
+                        <Box sx={{ flexGrow: 1, border: '1px solid #ddd', borderRadius: '4px', p: 2, overflowY: 'auto' }}>
+                            
+                            {/* --- MODIFIED: SIMPLIFIED TAG DETAILS (Search Match) --- */}
+                            {matchedTag && !selectedSentence ? (
+                                <Box>
+                                    <Box sx={{ p: 2, border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#e3f2fd' }}> 
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>Text: {matchedTag.text}</Typography>
+                                        <Typography variant="subtitle2" color="primary">Label: {matchedTag.tag}</Typography>
+                                    </Box>
+                                </Box>
+                            ) :
+                            /* --- Default message when nothing is selected --- */
+                            !selectedSentence ? (
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                                    <Typography color="text.secondary">Select a sentence to begin.</Typography>
+                                </Box>
+                            ) : editingTag.isActive ? (
+                              <Box>
+                                <Typography variant="overline">EDIT TAG</Typography>
+                                <TextField 
+                                label="Editable Tag Text" 
+                                fullWidth 
+                                variant="outlined" 
+                                sx={{ my: 2 }} 
+                                value={editingTag.text} 
+                                onChange={(e) => setEditingTag(prev => ({ ...prev, text: e.target.value }))} 
+                                />
+                                
+                                {/* REPLACE THIS TEXTFIELD WITH SELECT DROPDOWN */}
+                                <FormControl fullWidth sx={{ mb: 2 }}>
+                                <InputLabel>Tag Label</InputLabel>
+                                <Select
+                                    value={editingTag.tag}
+                                    label="Tag Label"
+                                    onChange={(e) => setEditingTag(prev => ({ ...prev, tag: e.target.value }))}
+                                >
+                                    {PREDEFINED_TAGS.map((tag) => (
+                                    <MenuItem key={tag} value={tag}>
+                                        {tag}
+                                    </MenuItem>
+                                    ))}
+                                </Select>
+                                </FormControl>
+                                
+                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                <Button onClick={handleUpdateTag} variant="contained">Save Changes</Button>
+                                <Button onClick={() => setEditingTag({ isActive: false, _id: null, text: '', tag: '' })} variant="outlined">Cancel</Button>
+                                </Box>
+                            </Box>
+                            ) : newSelection.isActive ? (
+                                 <Box>
+                                    <Typography variant="overline">CREATE NEW TAG</Typography>
+                                    <TextField 
+                                    label="Selected Text" 
+                                    fullWidth 
+                                    variant="outlined" 
+                                    value={newSelection.text} 
+                                    onChange={(e) => setNewSelection(s => ({ ...s, text: e.target.value }))} 
+                                    sx={{ my: 2 }} 
+                                    />
+                                    
+                                    {/* REPLACE THIS TEXTFIELD WITH SELECT DROPDOWN */}
+                                    <FormControl fullWidth sx={{ mb: 2 }}>
+                                    <InputLabel>Tag Label</InputLabel>
+                                    <Select
+                                        value={newSelection.tag}
+                                        label="Tag Label"
+                                        onChange={(e) => setNewSelection(s => ({ ...s, tag: e.target.value }))}
+                                    >
+                                        {PREDEFINED_TAGS.map((tag) => (
+                                        <MenuItem key={tag} value={tag}>
+                                            {tag}
+                                        </MenuItem>
+                                        ))}
+                                    </Select>
+                                    </FormControl>
+                                    
+                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                    <Button onClick={handleSaveNewTag} variant="contained">Save Tag</Button>
+                                    <Button onClick={() => setNewSelection({ isActive: false, text: '', tag: '' })} variant="outlined">Cancel</Button>
+                                    </Box>
+                                </Box>
+                            ) : (
+                                <Box>
+                                    <Typography variant="overline">TAGS FOR THIS SENTENCE</Typography>
+                                    <Box sx={{ my: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                        {currentSentenceTags.map(tag => (
+                                            <Chip key={tag._id} label={`${tag.text} (${tag.tag})`} onDelete={() => handleRemoveTag(tag._id)} onClick={() => handleStartEditTag(tag)} color="primary" sx={{ cursor: "pointer" }} />
+                                        ))}
+                                        {autoTags.map((autoTag, index) => {
+                                            const isAlreadyManual = currentSentenceTags.some(manualTag => manualTag.text === autoTag.text);
+                                            if (isAlreadyManual) return null;
+                                            return <Chip key={`auto-${index}`} label={`${autoTag.text} (${autoTag.tag})`} variant="outlined" title="Automatically detected tag" />;
+                                        })}
+                                        {currentSentenceTags.length === 0 && autoTags.length === 0 && (
+                                            <Typography color="text.secondary">No tags yet. Highlight text to add one.</Typography>
+                                        )}
+                                    </Box>
+                                    <Typography variant="overline" sx={{ mt: 3, display: 'block' }}>SENTENCE ACTIONS</Typography>
+                                    <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                                        {/* Action buttons only visible when a sentence is selected */}
+                                        <Button 
+    variant="contained" 
+    color="success" 
+    onClick={() => handleStatusChange(true)} 
+    // Button is disabled if the sentence is ALREADY annotated
+    disabled={selectedSentence.is_annotated}
+>
+    Mark as Annotated
+</Button>
+<Button 
+    variant="outlined" 
+    color="secondary" 
+    onClick={() => handleStatusChange(false)} 
+    // Button is disabled if the sentence is NOT annotated
+    disabled={!selectedSentence.is_annotated}
+>
+    Mark as Not Annotated
+</Button>
+                                    </Box>
+                                </Box>
+                            )}
+                        </Box>
+                    </Box>
+                </Box>
+            </Paper>
+
+            <Dialog open={deleteConfirmation.isOpen} onClose={() => setDeleteConfirmation({ isOpen: false, sentenceId: null })}>
+                <DialogTitle>Confirm Deletion</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>Are you sure you want to delete this sentence? This action cannot be undone.</DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDeleteConfirmation({ isOpen: false, sentenceId: null })} color="secondary">Cancel</Button>
+                    
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={bulkUploadDialog} onClose={() => setBulkUploadDialog(false)}>
+                <DialogTitle>Bulk Upload Sentences</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Upload a .txt, .pdf, .doc, .docx, or .csv file with one sentence per line/paragraph/row.
+                        Optionally, add a tag to apply to all sentences.
+                    </DialogContentText>
+                    <input
+                        type="file"
+                        accept=".txt,.pdf,.doc,.docx,.csv"
+                        onChange={(e) => setFile(e.target.files[0])}
+                        style={{ marginTop: '16px', marginBottom: '16px' }}
+                    />
+                    <TextField
+                        fullWidth
+                        label="Optional Tag (e.g., Concept/Noun)"
+                        value={bulkTag}
+                        onChange={(e) => setBulkTag(e.target.value)}
+                        variant="outlined"
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setBulkUploadDialog(false)} color="secondary">Cancel</Button>
+                    
+                </DialogActions>
+            </Dialog>
+
+             <FeedbackDialog 
+                open={isFeedbackOpen} 
+                onClose={handleFeedbackClose} 
+                // Pass the user's email, falling back if userData hasn't loaded yet
+                userEmail={userData?.email || `${username}@placeholder.com`} 
+            />
+        </Container>
+    );
+}

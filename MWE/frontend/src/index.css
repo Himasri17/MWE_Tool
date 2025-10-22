@@ -1,0 +1,37 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* Add this to the bottom of your main CSS file */
+
+/* This targets the scrollbar track for Webkit browsers like Chrome */
+::-webkit-scrollbar {
+  width: 8px; /* Set the width of the scrollbar */
+}
+
+/* This targets the background of the scrollbar (the track) */
+::-webkit-scrollbar-track {
+  background: #f1f1f1; /* Light grey track */
+  border-radius: 4px;
+}
+
+/* This targets the draggable scrolling handle (the thumb) */
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1; /* Darker grey handle */
+  border-radius: 4px;
+}
+
+/* This changes the handle's color when you hover over it */
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8; /* Even darker grey on hover */
+}

@@ -1,0 +1,48 @@
+[{
+  "_id": {
+    "$oid": "68f1dfd3485d3c8956e1b0e7"
+  },
+  "username": "sashank97015@gmail.com",
+  "text": "म बहुत अ",
+  "tag": "Echo",
+  "source_sentence_id": "68f1dfd3485d3c8956e1b0df",
+  "annotation_date": {
+    "$date": "2025-10-17T06:18:59.851Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "68f1dfd3485d3c8956e1b0e8"
+  },
+  "username": "sashank97015@gmail.com",
+  "text": "पहुँचना चाहि",
+  "tag": "Opaque-Idiom",
+  "source_sentence_id": "68f1dfd3485d3c8956e1b0e0",
+  "annotation_date": {
+    "$date": "2025-10-17T06:18:59.852Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "68f1dfe2485d3c8956e1b0f3"
+  },
+  "text": "म बहुत अ",
+  "tag": "Echo",
+  "annotation_date": {
+    "$date": "2025-10-17T06:19:14.556Z"
+  },
+  "source_sentence_id": "68f1dfe2485d3c8956e1b0eb",
+  "username": "sashanktatavolu@gmail.com"
+},
+{
+  "_id": {
+    "$oid": "68f1dfe2485d3c8956e1b0f4"
+  },
+  "text": "पहुँचना चाहि",
+  "tag": "Opaque-Idiom",
+  "annotation_date": {
+    "$date": "2025-10-17T06:19:14.557Z"
+  },
+  "source_sentence_id": "68f1dfe2485d3c8956e1b0ec",
+  "username": "sashanktatavolu@gmail.com"
+}]
