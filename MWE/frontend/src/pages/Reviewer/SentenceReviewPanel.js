@@ -89,64 +89,157 @@ export default function SentenceReviewPanel() {
         fetchSentencesForReview();
     }, [fetchSentencesForReview]);
 
-    // --- NEW/MODIFIED: HANDLE PER-TAG APPROVAL/REJECTION ---
-    const handleTagReview = async (tagId, action, tagText, currentComment) => {
-    if (!selectedSentenceData) return;
-    
-    // CRITICAL VALIDATION: Comments required for rejection
-    if (action === 'Reject' && !currentComment.trim()) {
-        showSnackbar("Comments are required to reject a tag.", 'warning');
-        return;
-    }
-
-    const url = `http://127.0.0.1:5001/reviewer/tag/${tagId}/${action.toLowerCase()}`;
-    
-    setIsReviewSubmitting(true);
-
-    try {
-        const method = action === 'Approve' ? 'PUT' : 'DELETE'; 
+    const handleApproveSentenceWithoutTags = async (sentenceId) => {
+        if (!sentenceId) return;
         
-        // CRITICAL: Pass the comment in the body for BOTH actions (backend logs it on APPROVE, uses it on REJECT)
-        const bodyData = { 
-            reviewerUsername: username, 
-            comments: currentComment.trim() // Pass the comment from the local state
-        }; 
-        
-        const response = await fetch(url, {
-            method: method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(bodyData), 
-        });
+        setIsReviewSubmitting(true);
 
-        const data = await response.json();
+        try {
+            // You'll need to create a backend endpoint for this
+            const response = await fetch(`http://127.0.0.1:5001/reviewer/sentence/${sentenceId}/approve-without-tags`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    reviewerUsername: username,
+                    comments: reviewComments 
+                })
+            });
 
-        if (!response.ok) {
-            throw new Error(data.message || `Failed to ${action.toLowerCase()} tag.`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to approve sentence without tags.');
+            }
+
+            showSnackbar('Sentence approved successfully (no tags).', 'success');
+            
+            // Update local state
+            setSentences(prevSentences => prevSentences.map(s => {
+                if (s._id === sentenceId) {
+                    const updatedSentence = { 
+                        ...s, 
+                        review_status: 'Approved',
+                        is_annotated: true,
+                        review_comments: reviewComments
+                    };
+                    
+                    if (selectedSentenceData && selectedSentenceData._id === sentenceId) {
+                        setSelectedSentenceData(updatedSentence);
+                    }
+                    
+                    return updatedSentence;
+                }
+                return s;
+            }));
+
+        } catch (error) {
+            console.error('Error approving sentence without tags:', error);
+            showSnackbar(`Failed to approve sentence: ${error.message}`, 'error');
+        } finally {
+            setIsReviewSubmitting(false);
         }
+    };
 
-        showSnackbar(`Tag '${tagText}' successfully ${action}d.`, 'success');
-        
-        // Update local state: remove the tag from the selected sentence's tag array
+    const updateSentenceStatus = useCallback((sentenceId) => {
         setSentences(prevSentences => prevSentences.map(s => {
-            if (s._id === selectedSentenceData._id) {
-                const updatedTags = s.tags.filter(t => t._id !== tagId);
-                setSelectedSentenceData({ ...s, tags: updatedTags });
-
-                return { ...s, tags: updatedTags };
+            if (s._id === sentenceId) {
+                const hasPendingTags = s.tags.some(tag => tag.review_status === 'Pending');
+                const hasApprovedTags = s.tags.some(tag => tag.review_status === 'Approved');
+                
+                let newReviewStatus = 'Pending';
+                let newIsAnnotated = false;
+                
+                if (hasPendingTags) {
+                    newReviewStatus = 'Pending';
+                    newIsAnnotated = true;
+                } else if (hasApprovedTags) {
+                    newReviewStatus = 'Approved';
+                    newIsAnnotated = true;
+                } else {
+                    // No tags or all tags rejected
+                    newReviewStatus = 'Rejected';
+                    newIsAnnotated = false;
+                }
+                
+                const updatedSentence = { 
+                    ...s, 
+                    review_status: newReviewStatus,
+                    is_annotated: newIsAnnotated
+                };
+                
+                // Also update selected sentence if it's the current one
+                if (selectedSentenceData && selectedSentenceData._id === sentenceId) {
+                    setSelectedSentenceData(updatedSentence);
+                }
+                
+                return updatedSentence;
             }
             return s;
         }));
-        
-        // Clear the comment field for the tag
-        setTagComments(prev => { delete prev[tagId]; return { ...prev }; });
+    }, [selectedSentenceData]);
 
-    } catch (error) {
-        console.error(`Tag review error (${action}):`, error);
-        showSnackbar(`Tag ${action} failed: ${error.message}.`, 'error');
-    } finally {
-        setIsReviewSubmitting(false);
-    }
-};
+    const handleTagReview = async (tagId, action, tagText, currentComment) => {
+        if (!selectedSentenceData) return;
+        
+        // CRITICAL VALIDATION: Comments required for rejection
+        if (action === 'Reject' && !currentComment.trim()) {
+            showSnackbar("Comments are required to reject a tag.", 'warning');
+            return;
+        }
+
+        const url = `http://127.0.0.1:5001/reviewer/tag/${tagId}/${action.toLowerCase()}`;
+        
+        setIsReviewSubmitting(true);
+
+        try {
+            const method = action === 'Approve' ? 'PUT' : 'DELETE'; 
+            
+            const bodyData = { 
+                reviewerUsername: username, 
+                comments: currentComment.trim()
+            }; 
+            
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(bodyData), 
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || `Failed to ${action.toLowerCase()} tag.`);
+            }
+
+            showSnackbar(`Tag '${tagText}' successfully ${action}d.`, 'success');
+            
+            // Update local state: remove the tag from the selected sentence's tag array
+            setSentences(prevSentences => prevSentences.map(s => {
+                if (s._id === selectedSentenceData._id) {
+                    const updatedTags = s.tags.filter(t => t._id !== tagId);
+                    const updatedSentence = { ...s, tags: updatedTags };
+                    setSelectedSentenceData(updatedSentence);
+
+                    // NEW: Update the sentence status after tag operation
+                    setTimeout(() => {
+                        updateSentenceStatus(selectedSentenceData._id);
+                    }, 100);
+                    
+                    return updatedSentence;
+                }
+                return s;
+            }));
+            
+            // Clear the comment field for the tag
+            setTagComments(prev => { delete prev[tagId]; return { ...prev }; });
+
+        } catch (error) {
+            console.error(`Tag review error (${action}):`, error);
+            showSnackbar(`Tag ${action} failed: ${error.message}.`, 'error');
+        } finally {
+            setIsReviewSubmitting(false);
+        }
+    };
     // --- Handlers ---
     const handleLogout = async () => { navigate('/login'); };
     const handleBack = () => { navigate(`/reviewer/dashboard`); };
@@ -167,17 +260,17 @@ export default function SentenceReviewPanel() {
     const handleNextPage = () => { setCurrentPage(prev => Math.min(prev + 1, totalPages)); };
     const handlePrevPage = () => { setCurrentPage(prev => Math.max(prev - 1, 1)); };
 
-    // --- Annotation Rendering Function (UPDATED for per-tag controls) ---
     const renderAnnotationView = (sentenceData) => {
         if (!sentenceData) return <Alert severity="info">No sentence selected.</Alert>;
         
         const hasTags = sentenceData.tags && sentenceData.tags.length > 0;
         const currentStatus = sentenceData.review_status || 'Pending'; 
         const isAnnotated = sentenceData.is_annotated;
+        const hasNoTagsAndPending = !hasTags && currentStatus === 'Pending';
 
         const statusColor = currentStatus === 'Approved' ? 'success' : 
                             currentStatus === 'Rejected' ? 'error' : 'warning';
-                            
+                                
         return (
             <Box>
                 {/* Status and Text (Sentence Level) */}
@@ -216,87 +309,109 @@ export default function SentenceReviewPanel() {
                 
                 {
                     !hasTags ? (
-                        <Alert severity="info" sx={{mb: 3}}>No tags exist for this sentence (staged or approved).</Alert>
+                        <Box>
+                            <Alert severity="info" sx={{mb: 3}}>
+                                No tags exist for this sentence (staged or approved).
+                            </Alert>
+                            
+                            {/* NEW: Approve Sentence Button for sentences without tags */}
+                            {hasNoTagsAndPending && (
+                                <Box sx={{ mb: 3, p: 2, border: `2px dashed ${theme.palette.info.main}`, borderRadius: 1 }}>
+                                    <Typography variant="subtitle2" color="info.main" gutterBottom>
+                                        Approve this sentence without annotations?
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                        This sentence has been reviewed and doesn't require any Multiword Expression annotations.
+                                    </Typography>
+                                    <Button
+                                        variant="contained"
+                                        color="success"
+                                        startIcon={<CheckCircleIcon />}
+                                        onClick={() => handleApproveSentenceWithoutTags(sentenceData._id)}
+                                        disabled={isReviewSubmitting}
+                                    >
+                                        {isReviewSubmitting ? 'Approving...' : 'Approve Sentence (No Tags)'}
+                                    </Button>
+                                </Box>
+                            )}
+                        </Box>
                     ) : (
                         <Box sx={{maxHeight: '30vh', overflowY: 'auto', pr: 1, mb: 2}}>
                             {sentenceData.tags.map((tag, index) => {
-    const tagIsPending = tag.review_status === 'Pending';
-    const tagId = tag._id;
-    const currentComment = tagComments[tagId] || tag.review_comments || ''; // Get current comment
+                                const tagIsPending = tag.review_status === 'Pending';
+                                const tagId = tag._id;
+                                const currentComment = tagComments[tagId] || tag.review_comments || '';
 
-    return (
-        <Box key={tagId} sx={{ mb: 2, p: 1.5, border: `1px solid ${tagIsPending ? theme.palette.warning.light : theme.palette.success.light}`, borderRadius: 1 }}>
-            
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <Box>
-                    <Typography variant="body1" fontWeight="bold">
-                        {tag.text} 
-                        <Chip label={tag.tag} size="small" color={tagIsPending ? 'warning' : 'success'} sx={{ ml: 1, height: 20, fontSize: '0.75rem' }} />
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                        By: {tag.username} | Status: <span style={{ color: tagIsPending ? theme.palette.warning.dark : theme.palette.success.dark }}>{tag.review_status}</span>
-                    </Typography>
-                </Box>
-                
-                {/* PER-TAG ACTION BUTTONS */}
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                    {tagIsPending ? (
-                        <>
-                            <Button 
-                                variant="outlined" 
-                                size="small"
-                                // CRITICAL: Pass the current comment and use the per-tag handler
-                                onClick={() => handleTagReview(tagId, 'Reject', tag.text, currentComment)} 
-                                startIcon={isReviewSubmitting ? <CircularProgress size={16} color="error" /> : <CancelIcon />}
-                                color="error"
-                                disabled={isReviewSubmitting}
-                            >
-                                Reject
-                            </Button>
-                            <Button 
-                                variant="contained" 
-                                size="small"
-                                // CRITICAL: Pass the current comment
-                                onClick={() => handleTagReview(tagId, 'Approve', tag.text, currentComment)} 
-                                startIcon={isReviewSubmitting ? <CircularProgress size={16} color="success" /> : <CheckCircleIcon />}
-                                color="success"
-                                disabled={isReviewSubmitting}
-                            >
-                                Approve
-                            </Button>
-                        </>
-                    ) : (
-                        <Chip label="Final" color="success" size="small" variant="outlined" />
-                    )}
-                </Box>
-            </Box>
+                                return (
+                                    <Box key={tagId} sx={{ mb: 2, p: 1.5, border: `1px solid ${tagIsPending ? theme.palette.warning.light : theme.palette.success.light}`, borderRadius: 1 }}>
+                                        
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                            <Box>
+                                                <Typography variant="body1" fontWeight="bold">
+                                                    {tag.text} 
+                                                    <Chip label={tag.tag} size="small" color={tagIsPending ? 'warning' : 'success'} sx={{ ml: 1, height: 20, fontSize: '0.75rem' }} />
+                                                </Typography>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    By: {tag.username} | Status: <span style={{ color: tagIsPending ? theme.palette.warning.dark : theme.palette.success.dark }}>{tag.review_status}</span>
+                                                </Typography>
+                                            </Box>
+                                            
+                                            {/* PER-TAG ACTION BUTTONS */}
+                                            <Box sx={{ display: 'flex', gap: 1 }}>
+                                                {tagIsPending ? (
+                                                    <>
+                                                        <Button 
+                                                            variant="outlined" 
+                                                            size="small"
+                                                            onClick={() => handleTagReview(tagId, 'Reject', tag.text, currentComment)} 
+                                                            startIcon={isReviewSubmitting ? <CircularProgress size={16} color="error" /> : <CancelIcon />}
+                                                            color="error"
+                                                            disabled={isReviewSubmitting}
+                                                        >
+                                                            Reject
+                                                        </Button>
+                                                        <Button 
+                                                            variant="contained" 
+                                                            size="small"
+                                                            onClick={() => handleTagReview(tagId, 'Approve', tag.text, currentComment)} 
+                                                            startIcon={isReviewSubmitting ? <CircularProgress size={16} color="success" /> : <CheckCircleIcon />}
+                                                            color="success"
+                                                            disabled={isReviewSubmitting}
+                                                        >
+                                                            Approve
+                                                        </Button>
+                                                    </>
+                                                ) : (
+                                                    <Chip label="Final" color="success" size="small" variant="outlined" />
+                                                )}
+                                            </Box>
+                                        </Box>
 
-            {/* TAG-SPECIFIC COMMENT FIELD */}
-            {(tagIsPending || (tag.review_comments && tag.review_comments.length > 0)) && (
-                <TextField
-                    fullWidth
-                    size="small"
-                    multiline
-                    rows={1}
-                    // CRITICAL: Read and write to the tagComments object keyed by tagId
-                    value={currentComment}
-                    onChange={(e) => setTagComments(prev => ({ ...prev, [tagId]: e.target.value }))}
-                    placeholder="Enter comment for this specific tag..."
-                    variant="filled"
-                    sx={{ mt: 1, backgroundColor: 'white' }}
-                    disabled={!tagIsPending || isReviewSubmitting}
-                />
-            )}
-        </Box>
-    );
-})}
+                                        {/* TAG-SPECIFIC COMMENT FIELD */}
+                                        {(tagIsPending || (tag.review_comments && tag.review_comments.length > 0)) && (
+                                            <TextField
+                                                fullWidth
+                                                size="small"
+                                                multiline
+                                                rows={1}
+                                                value={currentComment}
+                                                onChange={(e) => setTagComments(prev => ({ ...prev, [tagId]: e.target.value }))}
+                                                placeholder="Enter comment for this specific tag..."
+                                                variant="filled"
+                                                sx={{ mt: 1, backgroundColor: 'white' }}
+                                                disabled={!tagIsPending || isReviewSubmitting}
+                                            />
+                                        )}
+                                    </Box>
+                                );
+                            })}
                         </Box>
                     )
                 }
                 
                 <Divider sx={{ my: 3 }} />
 
-                {/* REVIEWER NOTES TEXT FIELD (No buttons, relying on per-tag action) */}
+                {/* REVIEWER NOTES TEXT FIELD */}
                 <Typography variant="h6" gutterBottom>Reviewer Notes</Typography>
 
                 <TextField

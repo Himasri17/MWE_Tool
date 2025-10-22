@@ -502,6 +502,54 @@ def extract_text_from_file(file, file_extension):
         
     return sentences_data
 
+
+def update_sentence_review_status(sentence_id):
+    """Update sentence review status based on its tags"""
+    try:
+        # Count remaining staged tags for this sentence
+        remaining_staged_tags = staged_tags_collection.count_documents({
+            "source_sentence_id": sentence_id
+        })
+        
+        # Count approved tags for this sentence
+        approved_tags_count = tags_collection.count_documents({
+            "source_sentence_id": sentence_id
+        })
+        
+        # Check if sentence has been manually approved without tags
+        sentence = sentences_collection.find_one({"_id": ObjectId(sentence_id)})
+        current_status = sentence.get('review_status', 'Pending') if sentence else 'Pending'
+        
+        # If already manually approved, keep that status
+        if current_status == 'Approved' and approved_tags_count == 0 and remaining_staged_tags == 0:
+            # This is a manually approved sentence without tags - keep it approved
+            new_status = "Approved"
+            is_annotated = True
+        elif remaining_staged_tags > 0:
+            # Still has pending tags
+            new_status = "Pending"
+            is_annotated = True
+        elif approved_tags_count > 0:
+            # All tags processed and at least one approved
+            new_status = "Approved"
+            is_annotated = True
+        else:
+            # All tags rejected or no tags
+            new_status = "Rejected"
+            is_annotated = False
+            
+        # Update the sentence
+        sentences_collection.update_one(
+            {"_id": ObjectId(sentence_id)},
+            {"$set": {
+                "review_status": new_status,
+                "is_annotated": is_annotated
+            }}
+        )
+        
+    except Exception as e:
+        print(f"Error updating sentence status: {e}")
+            
 # --- API Routes ---
 
 @app.route("/register", methods=["POST"])
@@ -2855,65 +2903,55 @@ def get_staged_tags_for_review(sentence_id):
         print(f"Error fetching staged tags for review: {e}")
         return jsonify({"error": "Internal server error during tag retrieval."}), 500
 
-
 @app.route('/reviewer/tag/<tag_id>/approve', methods=['PUT'])
 def approve_tag(tag_id):
-    """
-    Approves a staged tag: moves it from staged_tags_collection to tags_collection.
-    """
     try:
-        # CRITICAL: Find the staged tag using ObjectId
         staged_tag = staged_tags_collection.find_one({"_id": ObjectId(tag_id)})
         if not staged_tag:
             return jsonify({"message": "Staged tag not found or already reviewed."}), 404
         
-        # 2. Prepare the final tag document (remove old ID for new insertion)
         final_tag = staged_tag
         final_tag.pop('_id') 
         
-        # 3. Insert into final collection
         tags_collection.insert_one(final_tag)
         search_tags_collection.insert_one(final_tag) 
         
-        # 4. Delete from staged collection
         staged_tags_collection.delete_one({"_id": ObjectId(tag_id)})
         
-        # 5. Log action
+        # NEW: Update sentence status
+        update_sentence_review_status(final_tag.get('source_sentence_id'))
+        
         log_action_and_update_report(request.json.get('reviewerUsername', 'system'), 
                                      f"Approved tag '{final_tag.get('text')}' by {final_tag.get('username')}.")
 
         return jsonify({"message": "Tag approved and finalized successfully."}), 200
-
     except Exception as e:
         print(f"Error approving tag: {e}")
-        # Ensure a clean JSON error response is returned
         return jsonify({"error": "Internal server error during tag approval."}), 500
 
 @app.route('/reviewer/tag/<tag_id>/reject', methods=['DELETE'])
 def reject_tag(tag_id):
-    """
-    Rejects a staged tag: deletes it directly from the staged_tags_collection.
-    """
     try:
-        # CRITICAL: Find the staged tag using ObjectId (for logging purposes)
         staged_tag = staged_tags_collection.find_one({"_id": ObjectId(tag_id)})
         if not staged_tag:
             return jsonify({"message": "Staged tag not found."}), 404
             
-        # 2. Delete from staged collection
+        sentence_id = staged_tag.get('source_sentence_id')
+        
         staged_tags_collection.delete_one({"_id": ObjectId(tag_id)})
         
-        # 3. Log action
+        # NEW: Update sentence status
+        update_sentence_review_status(sentence_id)
+        
         log_action_and_update_report(request.json.get('reviewerUsername', 'system'), 
                                      f"Rejected and deleted tag '{staged_tag.get('text')}' by {staged_tag.get('username')}.")
 
         return jsonify({"message": "Tag rejected and removed successfully."}), 200
-
     except Exception as e:
         print(f"Error rejecting tag: {e}")
-        # Ensure a clean JSON error response is returned
         return jsonify({"error": "Internal server error during tag rejection."}), 500
     
+
     
 @app.route('/tags/<username>', methods=['GET'])
 def get_tags(username):
@@ -2970,6 +3008,58 @@ def update_sentence_status(sentence_id):
         
     return jsonify({"message": "Status updated successfully"})
 
+@app.route('/reviewer/sentence/<sentence_id>/approve-without-tags', methods=['PUT'])
+def approve_sentence_without_tags(sentence_id):
+    """
+    Approve a sentence that has no tags (mark it as reviewed and approved)
+    """
+    try:
+        data = request.json
+        reviewer_username = data.get('reviewerUsername')
+        comments = data.get('comments', '')
+        
+        if not reviewer_username:
+            return jsonify({"error": "Reviewer username is required"}), 400
+
+        # Find the sentence
+        sentence = sentences_collection.find_one({"_id": ObjectId(sentence_id)})
+        if not sentence:
+            return jsonify({"message": "Sentence not found"}), 404
+
+        # Check if sentence actually has any tags (final or staged)
+        final_tags_count = tags_collection.count_documents({"source_sentence_id": sentence_id})
+        staged_tags_count = staged_tags_collection.count_documents({"source_sentence_id": sentence_id})
+        
+        if final_tags_count > 0 or staged_tags_count > 0:
+            return jsonify({"message": "Sentence has existing tags. Use tag-specific approval instead."}), 400
+
+        # Update the sentence status
+        update_result = sentences_collection.update_one(
+            {"_id": ObjectId(sentence_id)},
+            {"$set": {
+                "review_status": "Approved",
+                "is_annotated": True,
+                "review_comments": comments,
+                "annotation_email": reviewer_username,
+                "annotation_datetime": datetime.utcnow()
+            }}
+        )
+
+        if update_result.matched_count == 0:
+            return jsonify({"message": "Sentence not found"}), 404
+
+        # Log the action
+        log_action_and_update_report(
+            reviewer_username, 
+            f"Approved sentence without tags: '{sentence.get('textContent', '')}'"
+        )
+
+        return jsonify({"message": "Sentence approved successfully (no tags)"}), 200
+
+    except Exception as e:
+        print(f"Error approving sentence without tags: {e}")
+        return jsonify({"error": "Internal server error during sentence approval"}), 500
+    
 @app.route('/stats', methods=["GET"])
 def get_stats():
     try:
