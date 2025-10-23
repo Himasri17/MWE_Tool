@@ -216,7 +216,7 @@ export default function AdminDashboard() {
     };
 
     const handleDownload = (projectId, projectName) => { 
-        window.open(`http://127.0.0.1:5001/api/projects/${projectId}/download?user=${username}&format=XML`, '_blank'); 
+        window.open(`http://127.0.0.1:5001/api/projects/${projectId}/download?format=XML`, '_blank'); 
     };
     
  
@@ -445,7 +445,7 @@ const ImagePreviewDialog = () => (
                         <MenuItem 
                             onClick={() => { 
                                 handleMenuClose(); 
-                                handleDownload(project.id, project.name); 
+                                handleDownload(project.id, project.name);
                             }}
                         >
                             <FileDownloadIcon fontSize="small" sx={{ mr: 1 }} /> 

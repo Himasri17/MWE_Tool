@@ -56,39 +56,69 @@ const AnalyticsDashboard = () => {
     }, []);
 
     const fetchInitialData = async () => {
-        setLoading(true);
-        setError('');
-        try {
-            const [mweRes, networkRes, timelineRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/api/analytics/mwe-distribution`),
-                fetch(`${API_BASE_URL}/api/analytics/mwe-network`),
-                fetch(`${API_BASE_URL}/api/analytics/annotation-timeline`)
-            ]);
-            
-            if (mweRes.ok) setMweData(await mweRes.json());
-            else throw new Error('Failed to fetch MWE distribution');
-            
-            if (networkRes.ok) setNetworkData(await networkRes.json());
-            if (timelineRes.ok) setTimelineData(await timelineRes.json());
-        } catch (error) {
-            console.error('Error fetching data:', error);
-            setError('Failed to load analytics data. Please try again.');
+    setLoading(true);
+    setError('');
+    try {
+        console.log("=== FETCHING INITIAL ANALYTICS DATA ===");
+        
+        const [mweRes, networkRes, timelineRes] = await Promise.all([
+            fetch(`${API_BASE_URL}/api/analytics/mwe-distribution`),
+            fetch(`${API_BASE_URL}/api/analytics/mwe-network`),
+            fetch(`${API_BASE_URL}/api/analytics/annotation-timeline`)
+        ]);
+        
+        console.log("MWE Distribution Response:", mweRes.status, mweRes.ok);
+        console.log("Network Response:", networkRes.status, networkRes.ok);
+        console.log("Timeline Response:", timelineRes.status, timelineRes.ok);
+        
+        if (mweRes.ok) {
+            const mweData = await mweRes.json();
+            console.log("Initial MWE Data:", mweData);
+            setMweData(mweData);
+        } else {
+            throw new Error('Failed to fetch MWE distribution');
         }
-        setLoading(false);
-    };
+        
+        if (networkRes.ok) {
+            const networkData = await networkRes.json();
+            console.log("Network Data:", networkData);
+            setNetworkData(networkData);
+        }
+        
+        // Handle timeline data - use empty array if endpoint not found
+        if (timelineRes.ok) {
+            const timelineData = await timelineRes.json();
+            console.log("Timeline Data:", timelineData);
+            setTimelineData(timelineData);
+        } else if (timelineRes.status === 404) {
+            // Endpoint doesn't exist yet, use empty data
+            console.log("Timeline endpoint not available yet");
+            setTimelineData([]);
+        }
+    } catch (error) {
+        console.error('Error fetching data:', error);
+        setError('Failed to load analytics data. Please try again.');
+    }
+    setLoading(false);
+};
 
     const fetchProjects = async () => {
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/projects`);
-            if (res.ok) {
-                const data = await res.json();
-                setProjects(data);
-            }
-        } catch (error) {
-            console.error('Error fetching projects:', error);
+    try {
+        console.log("=== FETCHING PROJECTS FOR FILTER ===");
+        const res = await fetch(`${API_BASE_URL}/api/projects`);
+        console.log("Projects API Response:", res.status, res.ok);
+        
+        if (res.ok) {
+            const data = await res.json();
+            console.log("Projects data received:", data);
+            setProjects(data);
+        } else {
+            console.error("Failed to fetch projects:", res.status);
         }
-    };
-
+    } catch (error) {
+        console.error('Error fetching projects:', error);
+    }
+};
     const fetchUsers = async () => {
         try {
             const res = await fetch(`${API_BASE_URL}/api/users-list`);
@@ -108,22 +138,39 @@ const AnalyticsDashboard = () => {
     };
 
     const applyFilters = async (filterParams) => {
-        setLoading(true);
-        try {
-            const queryParams = new URLSearchParams();
-            Object.entries(filterParams).forEach(([key, value]) => {
-                if (value) queryParams.append(key, value);
-            });
+    setLoading(true);
+    try {
+        const queryParams = new URLSearchParams();
+        Object.entries(filterParams).forEach(([key, value]) => {
+            if (value) queryParams.append(key, value);
+        });
 
-            const res = await fetch(`${API_BASE_URL}/api/analytics/mwe-distribution?${queryParams}`);
-            if (res.ok) {
-                setMweData(await res.json());
-            }
-        } catch (error) {
-            console.error('Error applying filters:', error);
+        console.log("=== APPLYING FILTERS ===");
+        console.log("Filter parameters:", filterParams);
+        console.log("Query string:", queryParams.toString());
+
+        const url = `${API_BASE_URL}/api/analytics/mwe-distribution?${queryParams}`;
+        console.log("Full URL:", url);
+
+        const res = await fetch(url);
+        
+        console.log("Response status:", res.status);
+        console.log("Response ok:", res.ok);
+        
+        if (res.ok) {
+            const data = await res.json();
+            console.log("Filtered MWE Data received:", data);
+            setMweData(data);
+        } else {
+            console.error("Filter request failed:", res.status, res.statusText);
+            const errorText = await res.text();
+            console.error("Error response:", errorText);
         }
-        setLoading(false);
-    };
+    } catch (error) {
+        console.error('Error applying filters:', error);
+    }
+    setLoading(false);
+};
 
     const downloadReport = async (format) => {
         setLoading(true);
@@ -141,7 +188,7 @@ const AnalyticsDashboard = () => {
                 const contentType = res.headers.get('Content-Type');
                 
                 if (format === 'csv' || contentType.includes('text/csv')) {
-                    // Existing CSV download logic
+                    // Handle CSV download
                     const blob = await res.blob();
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
@@ -152,39 +199,19 @@ const AnalyticsDashboard = () => {
                     window.URL.revokeObjectURL(url);
                     document.body.removeChild(a);
                     
-                } else if (format === 'pdf' || contentType.includes('application/pdf')) {
-                    // *** FIX: PDF download logic implemented here ***
-                    const blob = await res.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
+                } else if (format === 'pdf') {
+                    // For PDF, always generate client-side from JSON
                     const reportData = await res.json();
-                    
-                    // Set the correct download name
-                    const filename = `annotation_report_${new Date().toISOString().split('T')[0]}.pdf`;
-                    
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                    
-                try {
-                        generatePdfReport(reportData); // Call the defined helper function
-                    } catch (pdfError) {
-                        console.error("PDF GENERATION FAILED:", pdfError);
-                        setError('Failed to generate PDF client-side. Check browser console.');
-                    }
+                    generatePdfReport(reportData);
                     
                 } else {
-                     // Fallback for non-downloadable formats or unexpected content
+                    // Handle other formats
                     const data = await res.json();
-                    console.log('Server data:', data);
-                    setError(`Report format error or server returned unexpected data.`);
+                    console.log('Server returned data:', data);
                 }
             } else {
-                 const errorText = await res.text();
-                 setError(`Download failed: ${res.status} ${res.statusText}. Details: ${errorText.substring(0, 50)}...`);
+                const errorText = await res.text();
+                setError(`Download failed: ${res.status} ${res.statusText}. ${errorText}`);
             }
         } catch (error) {
             console.error('Error during download/fetch:', error);
@@ -475,24 +502,107 @@ const AnalyticsDashboard = () => {
     doc.save(filename);
 };
 
-    const renderProjectAnalytics = () => (
+    const renderProjectAnalytics = () => {
+    console.log("=== PROJECT ANALYTICS DEBUG ===");
+    console.log("1. Raw MWE Data:", mweData);
+    console.log("2. Project Distribution Data:", mweData?.project_distribution);
+    
+    // Check if we have project distribution data
+    if (mweData?.project_distribution) {
+        console.log("3. Number of projects in distribution:", mweData.project_distribution.length);
+        mweData.project_distribution.forEach((project, index) => {
+            console.log(`   Project ${index + 1}:`, {
+                name: project.project_name,
+                annotations: project.count,
+                mwe_types: project.mwe_type_count
+            });
+        });
+    } else {
+        console.log("3. No project distribution data available");
+    }
+
+    const chartData = mweData?.project_distribution || [];
+    console.log("4. Final chart data:", chartData);
+
+    return (
         <Paper sx={{ p: 3, height: 500 }}>
             <Typography variant="h6" gutterBottom>
                 Project Progress
             </Typography>
-            <ResponsiveContainer width="100%" height="90%">
-                <BarChart data={mweData?.project_distribution || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="project_name" angle={-45} textAnchor="end" height={80} />
-                    <YAxis />
-                    <RechartsTooltip />
-                    <Legend />
-                    <Bar dataKey="count" fill={theme.palette.primary.main} name="Annotations" />
-                    <Bar dataKey="mwe_type_count" fill={theme.palette.secondary.main} name="MWE Types" />
-                </BarChart>
-            </ResponsiveContainer>
+            
+            {/* Debug Info - You can remove this later */}
+            <Box sx={{ mb: 2, p: 1, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                    Loaded: {chartData.length} projects with {mweData?.total_annotations || 0} total annotations
+                </Typography>
+            </Box>
+
+            {chartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="90%">
+                    <BarChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                            dataKey="project_name" 
+                            angle={-45} 
+                            textAnchor="end" 
+                            height={80}
+                            tick={{ fontSize: 12 }}
+                        />
+                        <YAxis />
+                        <RechartsTooltip 
+                            formatter={(value, name) => {
+                                if (name === 'Annotations') return [value, 'Total Annotations'];
+                                if (name === 'MWE Types') return [value, 'Unique MWE Types'];
+                                return [value, name];
+                            }}
+                            labelFormatter={(label) => `Project: ${label}`}
+                        />
+                        <Legend />
+                        <Bar 
+                            dataKey="count" 
+                            fill={theme.palette.primary.main} 
+                            name="Annotations" 
+                            radius={[4, 4, 0, 0]}
+                        />
+                        <Bar 
+                            dataKey="mwe_type_count" 
+                            fill={theme.palette.secondary.main} 
+                            name="MWE Types" 
+                            radius={[4, 4, 0, 0]}
+                        />
+                    </BarChart>
+                </ResponsiveContainer>
+            ) : (
+                <Box 
+                    sx={{ 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        justifyContent: 'center', 
+                        alignItems: 'center', 
+                        height: 400,
+                        gap: 2
+                    }}
+                >
+                    <Typography variant="h6" color="text.secondary">
+                        No Project Data Available
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" align="center">
+                        {loading ? 'Loading project data...' : 'No annotation data found for projects.'}
+                    </Typography>
+                    <Button 
+                        variant="outlined" 
+                        onClick={() => {
+                            console.log("Manual refresh triggered for project analytics");
+                            applyFilters(filters);
+                        }}
+                    >
+                        Refresh Data
+                    </Button>
+                </Box>
+            )}
         </Paper>
     );
+};
 
     return (
         <Box sx={{ flexGrow: 1, p: 3, backgroundColor: theme.palette.background.default, minHeight: '100vh' }}>
@@ -556,7 +666,7 @@ const AnalyticsDashboard = () => {
                                 </FormControl>
                             </Grid>
                             
-                            <Grid item xs={12} sm={6} md={2}>
+                           <Grid item xs={12} sm={6} md={2}>
                                 <FormControl fullWidth size="small">
                                     <InputLabel>Project</InputLabel>
                                     <Select

@@ -281,8 +281,8 @@ def clean_sentence_text(text):
 
 def extract_from_xml(file):
     """
-    Parses sentences and annotations directly from the structured XML file format (re-import).
-    Returns a list of dictionaries containing sentence text, status, and tags. (UNCHANGED)
+    Parses sentences and annotations directly from the structured XML file format.
+    Returns a list of dictionaries containing sentence text, status, and tags.
     """
     sentences_data = []
     
@@ -295,26 +295,24 @@ def extract_from_xml(file):
         parser = etree.XMLParser(recover=True, encoding='utf-8')
         root = etree.fromstring(xml_content, parser=parser)
         
-        # Check if this is the new format (with sentences wrapper)
+        print(f"DEBUG: Root tag: {root.tag}")
+        
+        # Check if this is the project > sentences > sentence structure
         sentences_root = root.find(".//sentences")
         if sentences_root is not None:
-            # New format: <project><sentences><sentence ...></sentence></sentences></project>
+            print("DEBUG: Found sentences root element")
             sentence_elems = sentences_root.findall(".//sentence")
         else:
-            # Old format: direct sentence elements
+            # Fallback: look for sentence elements anywhere
             sentence_elems = root.findall(".//sentence")
         
+        print(f"DEBUG: Found {len(sentence_elems)} sentence elements")
+        
         for sentence_elem in sentence_elems:
-            # Try to get text from attribute first (new format)
+            # Get text from 'text' attribute
             text_content = sentence_elem.get('text', '').strip()
             
-            # If not found in attribute, try to find Text element (old format)
-            if not text_content:
-                text_elem = sentence_elem.find('Text')
-                if text_elem is not None:
-                    text_content = text_elem.text.strip() if text_elem.text else ''
-            
-            # Try to get is_annotated from attribute first (new format)
+            # Get is_annotated from attribute
             is_annotated_attr = sentence_elem.get('isAnnotated', '').strip().lower()
             if is_annotated_attr:
                 is_annotated = is_annotated_attr == 'true'
@@ -326,12 +324,17 @@ def extract_from_xml(file):
             tags = []
             annotations_elem = sentence_elem.find('annotations')
             if annotations_elem is not None:
-                for annotation_elem in annotations_elem.findall('annotation'):
+                annotation_elems = annotations_elem.findall('annotation')
+                print(f"DEBUG: Found {len(annotation_elems)} annotation elements for sentence: {text_content[:50]}...")
+                
+                for annotation_elem in annotation_elems:
                     # Get annotation data from attributes
                     word_phrase = annotation_elem.get('word_phrase', '').strip()
                     annotation_type = annotation_elem.get('annotation', '').strip()
                     annotated_by = annotation_elem.get('annotated_by', '').strip()
                     annotated_on = annotation_elem.get('annotated_on', '').strip()
+                    
+                    print(f"DEBUG: Annotation found - word_phrase: '{word_phrase}', type: '{annotation_type}', by: '{annotated_by}', on: '{annotated_on}'")
                     
                     if word_phrase and annotation_type:
                         tags.append({
@@ -347,14 +350,17 @@ def extract_from_xml(file):
                     "is_annotated": is_annotated,
                     "tags": tags 
                 })
+                print(f"DEBUG: Added sentence: '{text_content}' with {len(tags)} tags, is_annotated: {is_annotated}")
                 
     except etree.XMLSyntaxError as e:
         print(f"XML Parsing Error: {e}")
         raise ValueError("Invalid XML file structure.")
     except Exception as e:
         print(f"Generic XML Extraction Error: {e}")
+        print(f"Error details: {traceback.format_exc()}")
         raise ValueError("Failed to process XML content.")
 
+    print(f"DEBUG: Total sentences extracted: {len(sentences_data)}")
     return sentences_data
 
 def extract_text_from_file(file, file_extension):
@@ -1186,10 +1192,10 @@ def logout():
 @app.route('/api/users-list', methods=['GET'])
 def get_users_list():
     try:
-        # Get only approved non-admin users
+        # Get only approved non-admin AND non-reviewer users
         users = users_collection.find({
             'is_approved': True, 
-            'role': {'$ne': 'admin'}
+            'role': {'$nin': ['admin', 'reviewer']}  # Exclude both admin and reviewer roles
         }, {'username': 1, '_id': 0})
         
         user_list = [user['username'] for user in users]
@@ -1197,7 +1203,6 @@ def get_users_list():
     except Exception as e:
         print(f"Error fetching users: {e}")
         return jsonify({"error": "Internal server error"}), 500
-   
    
 @app.route("/api/user/<username>", methods=["GET"])
 def get_user_data(username):
@@ -1218,7 +1223,7 @@ def get_user_data(username):
 
 @app.route("/api/analytics/mwe-distribution", methods=["GET"])
 def get_mwe_distribution():
-    """Get MWE type distribution across various dimensions"""
+    """Get MWE type distribution across various dimensions - IMPROVED SIMPLIFIED VERSION"""
     try:
         # Get optional filters from query parameters
         language = request.args.get("language")
@@ -1227,162 +1232,137 @@ def get_mwe_distribution():
         start_date = request.args.get("start_date")
         end_date = request.args.get("end_date")
         
-        # Build match filter
-        match_filter = {}
-        if language:
-            match_filter["language"] = language
+        print(f"DEBUG: Analytics request - project_id: {project_id}")
+        
+        # Build filter for tags
+        tag_filter = {}
         if username:
-            match_filter["username"] = username
+            tag_filter["username"] = username
         if start_date and end_date:
             try:
                 start_dt = datetime.strptime(start_date, "%Y-%m-%d")
                 end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
-                match_filter["annotation_date"] = {"$gte": start_dt, "$lte": end_dt}
+                tag_filter["annotation_date"] = {"$gte": start_dt, "$lte": end_dt}
             except ValueError:
                 return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
         
-        # If project_id is provided, we need to join with sentences collection
-        if project_id:
-            # First, get all sentence IDs for this project
-            project_sentences = list(sentences_collection.find(
-                {"project_id": project_id}, 
-                {"_id": 1}
-            ))
-            sentence_ids = [str(s["_id"]) for s in project_sentences]
+        # Get filtered tags
+        all_tags = list(tags_collection.find(tag_filter))
+        print(f"DEBUG: Found {len(all_tags)} tags with filter: {tag_filter}")
+        
+        # Initialize statistics
+        project_stats = {}
+        mwe_type_stats = {}
+        language_stats = {}
+        user_stats = {}
+        
+        for tag in all_tags:
+            tag_type = tag.get("tag", "Unknown")
+            tag_user = tag.get("username", "Unknown")
+            sentence_id = tag.get("source_sentence_id")
             
-            if sentence_ids:
-                match_filter["source_sentence_id"] = {"$in": sentence_ids}
-            else:
-                # No sentences found for this project
-                return jsonify({
-                    "total_annotations": 0,
-                    "mwe_types": [],
-                    "language_distribution": [],
-                    "user_distribution": [],
-                    "project_distribution": []
-                }), 200
+            # Count by MWE type
+            if tag_type not in mwe_type_stats:
+                mwe_type_stats[tag_type] = {"count": 0, "unique_words": set()}
+            mwe_type_stats[tag_type]["count"] += 1
+            mwe_type_stats[tag_type]["unique_words"].add(tag.get("text", "").lower())
+            
+            # Count by user
+            if tag_user not in user_stats:
+                user_stats[tag_user] = {"count": 0, "mwe_types": set()}
+            user_stats[tag_user]["count"] += 1
+            user_stats[tag_user]["mwe_types"].add(tag_type)
+            
+            # Count by project and language
+            if sentence_id:
+                sentence = sentences_collection.find_one({"_id": ObjectId(sentence_id)})
+                if sentence:
+                    project_id_from_sentence = sentence.get("project_id")
+                    
+                    # Find project name and language
+                    project_name = "Unassigned / Unknown Project"
+                    project_language = "Unknown"
+                    
+                    if project_id_from_sentence:
+                        try:
+                            project = projects_collection.find_one({"_id": ObjectId(project_id_from_sentence)})
+                            if project:
+                                project_name = project.get("name", "Unknown Project")
+                                project_language = project.get("language", "Unknown")
+                        except:
+                            # Try finding project as string
+                            project = projects_collection.find_one({"_id": project_id_from_sentence})
+                            if project:
+                                project_name = project.get("name", "Unknown Project")
+                                project_language = project.get("language", "Unknown")
+                    
+                    # Update project stats
+                    if project_name not in project_stats:
+                        project_stats[project_name] = {
+                            "count": 0,
+                            "mwe_types": set()
+                        }
+                    project_stats[project_name]["count"] += 1
+                    project_stats[project_name]["mwe_types"].add(tag_type)
+                    
+                    # Update language stats
+                    if project_language not in language_stats:
+                        language_stats[project_language] = {"count": 0, "mwe_types": set()}
+                    language_stats[project_language]["count"] += 1
+                    language_stats[project_language]["mwe_types"].add(tag_type)
         
-        # Main aggregation pipeline for MWE distribution
-        pipeline = [
-            {"$match": match_filter},
-            {"$group": {
-                "_id": "$tag",
-                "count": {"$sum": 1},
-                "unique_words": {"$addToSet": "$text"}
-            }},
-            {"$project": {
-                "mwe_type": "$_id",
-                "count": 1,
-                "unique_word_count": {"$size": "$unique_words"},
-                "_id": 0
-            }},
-            {"$sort": {"count": -1}}
-        ]
+        # Convert to the expected format
+        project_distribution = []
+        for project_name, stats in project_stats.items():
+            project_distribution.append({
+                "project_name": project_name,
+                "count": stats["count"],
+                "mwe_type_count": len(stats["mwe_types"])
+            })
         
-        mwe_distribution = list(tags_collection.aggregate(pipeline))
+        mwe_types_distribution = []
+        for mwe_type, stats in mwe_type_stats.items():
+            mwe_types_distribution.append({
+                "mwe_type": mwe_type,
+                "count": stats["count"],
+                "unique_word_count": len(stats["unique_words"])
+            })
         
-        # Additional aggregations for different dimensions
-        # Language distribution
-        lang_pipeline = [
-            {"$lookup": {
-                "from": "sentences",
-                "localField": "source_sentence_id",
-                "foreignField": "_id",
-                "as": "sentence_info"
-            }},
-            {"$unwind": {"path": "$sentence_info", "preserveNullAndEmptyArrays": True}},
-            {"$lookup": {
-                "from": "projects",
-                "localField": "sentence_info.project_id",
-                "foreignField": "_id",
-                "as": "project_info"
-            }},
-            {"$unwind": {"path": "$project_info", "preserveNullAndEmptyArrays": True}},
-            {"$group": {
-                "_id": "$project_info.language",
-                "count": {"$sum": 1},
-                "mwe_types": {"$addToSet": "$tag"}
-            }},
-            {"$project": {
-                "language": {"$ifNull": ["$_id", "Unknown"]},
-                "count": 1,
-                "mwe_type_count": {"$size": "$mwe_types"},
-                "_id": 0
-            }},
-            {"$sort": {"count": -1}}
-        ]
+        language_distribution = []
+        for lang, stats in language_stats.items():
+            language_distribution.append({
+                "language": lang,
+                "count": stats["count"],
+                "mwe_type_count": len(stats["mwe_types"])
+            })
         
-        language_distribution = list(tags_collection.aggregate(lang_pipeline))
+        user_distribution = []
+        for user, stats in user_stats.items():
+            user_distribution.append({
+                "username": user,
+                "count": stats["count"],
+                "mwe_type_count": len(stats["mwe_types"])
+            })
         
-        # User distribution
-        user_pipeline = [
-            {"$match": match_filter},
-            {"$group": {
-                "_id": "$username",
-                "count": {"$sum": 1},
-                "mwe_types": {"$addToSet": "$tag"}
-            }},
-            {"$project": {
-                "username": "$_id",
-                "count": 1,
-                "mwe_type_count": {"$size": "$mwe_types"},
-                "_id": 0
-            }},
-            {"$sort": {"count": -1}}
-        ]
-        
-        user_distribution = list(tags_collection.aggregate(user_pipeline))
-        
-        # Project distribution
-        project_pipeline = [
-            {"$lookup": {
-                "from": "sentences",
-                "localField": "source_sentence_id",
-                "foreignField": "_id",
-                "as": "sentence_info"
-            }},
-            {"$unwind": {"path": "$sentence_info", "preserveNullAndEmptyArrays": True}},
-            {"$lookup": {
-                "from": "projects",
-                "localField": "sentence_info.project_id",
-                "foreignField": "_id",
-                "as": "project_info"
-            }},
-            {"$unwind": {"path": "$project_info", "preserveNullAndEmptyArrays": True}},
-            {"$match": match_filter},
-            {"$group": {
-                "_id": "$project_info.name",
-                "count": {"$sum": 1},
-                "mwe_types": {"$addToSet": "$tag"},
-                "project_id": {"$first": "$sentence_info.project_id"}
-            }},
-            {"$project": {
-                "project_name": {"$ifNull": ["$_id", "Unknown Project"]},
-                "project_id": 1,
-                "count": 1,
-                "mwe_type_count": {"$size": "$mwe_types"},
-                "_id": 0
-            }},
-            {"$sort": {"count": -1}}
-        ]
-        
-        project_distribution = list(tags_collection.aggregate(project_pipeline))
-        
-        total_annotations = sum(item["count"] for item in mwe_distribution)
+        print(f"DEBUG: Processed {len(all_tags)} tags into:")
+        print(f"  - {len(project_distribution)} projects")
+        print(f"  - {len(mwe_types_distribution)} MWE types") 
+        print(f"  - {len(language_distribution)} languages")
+        print(f"  - {len(user_distribution)} users")
         
         return jsonify({
-            "total_annotations": total_annotations,
-            "mwe_types": mwe_distribution,
+            "total_annotations": len(all_tags),
+            "mwe_types": mwe_types_distribution,
             "language_distribution": language_distribution,
             "user_distribution": user_distribution,
             "project_distribution": project_distribution
         }), 200
         
     except Exception as e:
-        print(f"Error fetching MWE distribution: {e}")
+        print(f"Error in simplified MWE distribution: {e}")
+        print(f"Error details: {traceback.format_exc()}")
         return jsonify({"error": "Internal server error"}), 500
-
-
+    
 @app.route("/api/analytics/mwe-network", methods=["GET"])
 def get_mwe_network():
     """Generate network data for MWE relationships"""
@@ -1487,10 +1467,87 @@ def get_mwe_network():
         print(f"Error generating MWE network: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
+@app.route("/api/analytics/annotation-timeline", methods=["GET"])
+def get_annotation_timeline():
+    """Get annotation timeline data for the last 30 days"""
+    try:
+        # Get optional filters
+        language = request.args.get("language")
+        project_id = request.args.get("project_id")
+        username = request.args.get("username")
+        
+        # Build match filter
+        match_filter = {}
+        if username:
+            match_filter["username"] = username
+        
+        # If project_id is provided, filter by project sentences
+        if project_id:
+            project_sentences = list(sentences_collection.find(
+                {"project_id": project_id}, 
+                {"_id": 1}
+            ))
+            sentence_ids = [str(s["_id"]) for s in project_sentences]
+            if sentence_ids:
+                match_filter["source_sentence_id"] = {"$in": sentence_ids}
+        
+        # Calculate date range (last 30 days)
+        end_date = datetime.utcnow()
+        start_date = end_date - timedelta(days=30)
+        
+        match_filter["annotation_date"] = {"$gte": start_date, "$lte": end_date}
+        
+        # Aggregate timeline data by date
+        pipeline = [
+            {"$match": match_filter},
+            {"$group": {
+                "_id": {
+                    "$dateToString": {
+                        "format": "%Y-%m-%d",
+                        "date": "$annotation_date"
+                    }
+                },
+                "count": {"$sum": 1},
+                "unique_annotators": {"$addToSet": "$username"}
+            }},
+            {"$project": {
+                "date": "$_id",
+                "count": 1,
+                "unique_annotators_count": {"$size": "$unique_annotators"},
+                "_id": 0
+            }},
+            {"$sort": {"date": 1}}
+        ]
+        
+        timeline_data = list(tags_collection.aggregate(pipeline))
+        
+        # Fill in missing dates with zeros
+        filled_timeline = []
+        current_date = start_date
+        while current_date <= end_date:
+            date_str = current_date.strftime("%Y-%m-%d")
+            existing_data = next((item for item in timeline_data if item["date"] == date_str), None)
+            
+            if existing_data:
+                filled_timeline.append(existing_data)
+            else:
+                filled_timeline.append({
+                    "date": date_str,
+                    "count": 0,
+                    "unique_annotators_count": 0
+                })
+            
+            current_date += timedelta(days=1)
+        
+        return jsonify(filled_timeline), 200
+        
+    except Exception as e:
+        print(f"Error fetching annotation timeline: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route("/api/analytics/reports/download", methods=["GET"])
 def download_analytics_report():
-    """Download comprehensive analytics report in CSV or PDF format"""
+    """Download comprehensive analytics report in CSV or PDF format - FIXED VERSION"""
     try:
         report_type = request.args.get("type", "csv")  # csv or pdf
         language = request.args.get("language")
@@ -1498,137 +1555,186 @@ def download_analytics_report():
         start_date = request.args.get("start_date")
         end_date = request.args.get("end_date")
         
-        # Build base filter for data
-        base_filter = {}
+        print(f"DEBUG: Download report requested - type: {report_type}, project_id: {project_id}")
+        
+        # Build filter for tags (same as in mwe-distribution)
+        tag_filter = {}
         if language:
-            base_filter["language"] = language
+            tag_filter["language"] = language
+        if project_id:
+            # Get sentences for this project and filter tags by those sentence IDs
+            project_sentences = list(sentences_collection.find(
+                {"project_id": project_id}, 
+                {"_id": 1}
+            ))
+            sentence_ids = [str(s["_id"]) for s in project_sentences]
+            if sentence_ids:
+                tag_filter["source_sentence_id"] = {"$in": sentence_ids}
+            else:
+                # No sentences for this project
+                print(f"DEBUG: No sentences found for project {project_id}")
         if start_date and end_date:
             try:
                 start_dt = datetime.strptime(start_date, "%Y-%m-%d")
                 end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
-                base_filter["annotation_date"] = {"$gte": start_dt, "$lte": end_dt}
+                tag_filter["annotation_date"] = {"$gte": start_dt, "$lte": end_dt}
             except ValueError:
                 return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
         
-        # Get basic statistics
-        total_sentences = sentences_collection.count_documents({})
-        annotated_sentences = sentences_collection.count_documents({"is_annotated": True})
-        total_annotations = tags_collection.count_documents({})
+        print(f"DEBUG: Base filter for report: {tag_filter}")
         
-        # Get user statistics
-        user_stats = list(users_collection.aggregate([
-            {"$lookup": {
-                "from": "sentences",
-                "localField": "username",
-                "foreignField": "username",
-                "as": "user_sentences"
-            }},
-            {"$lookup": {
-                "from": "tags",
-                "localField": "username",
-                "foreignField": "username",
-                "as": "user_annotations"
-            }},
-            {"$project": {
-                "username": 1,
-                "full_name": 1,
-                "role": 1,
-                "organization": 1,
-                "total_sentences": {"$size": "$user_sentences"},
-                "annotated_sentences": {
-                    "$size": {
-                        "$filter": {
-                            "input": "$user_sentences",
-                            "as": "sentence",
-                            "cond": {"$eq": ["$$sentence.is_annotated", True]}
-                        }
-                    }
-                },
-                "total_annotations": {"$size": "$user_annotations"},
-                "approval_rate": {
-                    "$cond": [
-                        {"$eq": [{"$size": "$user_sentences"}, 0]},
-                        0,
-                        {
-                            "$divide": [
-                                {"$size": {
-                                    "$filter": {
-                                        "input": "$user_sentences",
-                                        "as": "sentence",
-                                        "cond": {"$eq": ["$$sentence.is_annotated", True]}
-                                    }
-                                }},
-                                {"$size": "$user_sentences"}
-                            ]
-                        }
-                    ]
-                }
-            }}
-        ]))
+        # Get basic statistics using SIMPLIFIED APPROACH
+        all_tags = list(tags_collection.find(tag_filter))
+        print(f"DEBUG: Found {len(all_tags)} tags for report")
         
-        # Get MWE type statistics
-        mwe_stats = list(tags_collection.aggregate([
+        # Calculate sentence statistics PROPERLY
+        # Get all unique sentences across all users
+        pipeline = [
             {"$group": {
-                "_id": "$tag",
-                "count": {"$sum": 1},
-                "unique_phrases": {"$addToSet": "$text"},
-                "unique_annotators": {"$addToSet": "$username"}
-            }},
-            {"$project": {
-                "mwe_type": "$_id",
-                "count": 1,
-                "unique_phrases_count": {"$size": "$unique_phrases"},
-                "unique_annotators_count": {"$size": "$unique_annotators"},
-                "_id": 0
-            }},
-            {"$sort": {"count": -1}}
-        ]))
-        
-        # Get project statistics
-        project_stats = list(projects_collection.aggregate([
-            {"$lookup": {
-                "from": "sentences",
-                "localField": "_id",
-                "foreignField": "project_id",
-                "as": "project_sentences"
-            }},
-            {"$project": {
-                "project_name": "$name",
-                "language": 1,
-                "description": 1,
-                "created_at": 1,
-                "total_sentences": {"$size": "$project_sentences"},
-                "annotated_sentences": {
-                    "$size": {
-                        "$filter": {
-                            "input": "$project_sentences",
-                            "as": "sentence",
-                            "cond": {"$eq": ["$$sentence.is_annotated", True]}
-                        }
-                    }
+                "_id": {
+                    "project_id": "$project_id", 
+                    "original_index": "$original_index"
                 },
-                "completion_rate": {
-                    "$cond": [
-                        {"$eq": [{"$size": "$project_sentences"}, 0]},
-                        0,
-                        {
-                            "$divide": [
-                                {"$size": {
-                                    "$filter": {
-                                        "input": "$project_sentences",
-                                        "as": "sentence",
-                                        "cond": {"$eq": ["$$sentence.is_annotated", True]}
-                                    }
-                                }},
-                                {"$size": "$project_sentences"}
-                            ]
-                        }
-                    ]
-                }
+                "is_annotated_status": {"$max": {"$cond": ["$is_annotated", 1, 0]}},
+                "project_id": {"$first": "$project_id"}
             }},
-            {"$sort": {"created_at": -1}}
-        ]))
+            {"$group": {
+                "_id": None,
+                "total_unique_sentences": {"$sum": 1},
+                "total_annotated": {"$sum": "$is_annotated_status"}
+            }}
+        ]
         
+        stats_result = list(sentences_collection.aggregate(pipeline))
+        if stats_result:
+            stats = stats_result[0]
+            total_sentences = stats.get("total_unique_sentences", 0)
+            annotated_sentences = stats.get("total_annotated", 0)
+        else:
+            total_sentences = 0
+            annotated_sentences = 0
+
+        # Get user statistics
+        user_stats = []
+        all_users = list(users_collection.find({}))
+        
+        for user in all_users:
+            username = user["username"]
+            
+            # Count user's unique sentences and annotations
+            user_sentences_pipeline = [
+                {"$match": {"username": username}},
+                {"$group": {
+                    "_id": {
+                        "project_id": "$project_id", 
+                        "original_index": "$original_index"
+                    },
+                    "is_annotated_status": {"$max": {"$cond": ["$is_annotated", 1, 0]}}
+                }},
+                {"$group": {
+                    "_id": None,
+                    "total_sentences": {"$sum": 1},
+                    "annotated_sentences": {"$sum": "$is_annotated_status"}
+                }}
+            ]
+            
+            user_sentences_result = list(sentences_collection.aggregate(user_sentences_pipeline))
+            if user_sentences_result:
+                user_sentences_stats = user_sentences_result[0]
+                user_total_sentences = user_sentences_stats.get("total_sentences", 0)
+                user_annotated_sentences = user_sentences_stats.get("annotated_sentences", 0)
+            else:
+                user_total_sentences = 0
+                user_annotated_sentences = 0
+            
+            # Count user's tags
+            user_tags_count = tags_collection.count_documents({"username": username})
+            
+            # Calculate approval rate
+            approval_rate = (user_annotated_sentences / user_total_sentences * 100) if user_total_sentences > 0 else 0
+            
+            user_stats.append({
+                "username": username,
+                "full_name": user.get("full_name", "N/A"),
+                "role": user.get("role", "N/A"),
+                "organization": user.get("organization", "N/A"),
+                "total_sentences": user_total_sentences,
+                "annotated_sentences": user_annotated_sentences,
+                "total_annotations": user_tags_count,
+                "approval_rate": approval_rate
+            })
+
+        # Get MWE type statistics
+        mwe_stats = []
+        mwe_type_counts = {}
+        
+        for tag in all_tags:
+            mwe_type = tag.get("tag", "Unknown")
+            if mwe_type not in mwe_type_counts:
+                mwe_type_counts[mwe_type] = {
+                    "count": 0,
+                    "unique_phrases": set(),
+                    "unique_annotators": set()
+                }
+            mwe_type_counts[mwe_type]["count"] += 1
+            mwe_type_counts[mwe_type]["unique_phrases"].add(tag.get("text", "").lower())
+            mwe_type_counts[mwe_type]["unique_annotators"].add(tag.get("username", ""))
+        
+        for mwe_type, stats in mwe_type_counts.items():
+            mwe_stats.append({
+                "mwe_type": mwe_type,
+                "count": stats["count"],
+                "unique_phrases_count": len(stats["unique_phrases"]),
+                "unique_annotators_count": len(stats["unique_annotators"])
+            })
+
+        # Get project statistics - FIXED VERSION
+        project_stats = []
+        all_projects = list(projects_collection.find({}))
+        
+        for project in all_projects:
+            project_id_str = str(project["_id"])
+            project_name = project.get("name", "Unknown Project")
+            
+            # Count unique sentences for this project
+            project_sentences_pipeline = [
+                {"$match": {"project_id": project_id_str}},
+                {"$group": {
+                    "_id": {
+                        "project_id": "$project_id", 
+                        "original_index": "$original_index"
+                    },
+                    "is_annotated_status": {"$max": {"$cond": ["$is_annotated", 1, 0]}}
+                }},
+                {"$group": {
+                    "_id": None,
+                    "total_sentences": {"$sum": 1},
+                    "annotated_sentences": {"$sum": "$is_annotated_status"}
+                }}
+            ]
+            
+            project_sentences_result = list(sentences_collection.aggregate(project_sentences_pipeline))
+            if project_sentences_result:
+                project_sentences_stats = project_sentences_result[0]
+                project_total_sentences = project_sentences_stats.get("total_sentences", 0)
+                project_annotated_sentences = project_sentences_stats.get("annotated_sentences", 0)
+            else:
+                project_total_sentences = 0
+                project_annotated_sentences = 0
+            
+            completion_rate = (project_annotated_sentences / project_total_sentences * 100) if project_total_sentences > 0 else 0
+            
+            project_stats.append({
+                "project_name": project_name,
+                "language": project.get("language", "Unknown"),
+                "total_sentences": project_total_sentences,
+                "annotated_sentences": project_annotated_sentences,
+                "completion_rate": completion_rate,
+                "created_date": project.get("created_at", datetime.utcnow()).strftime("%Y-%m-%d") if project.get("created_at") else "N/A"
+            })
+
+        print(f"DEBUG: Report statistics - Sentences: {total_sentences}/{annotated_sentences}, Users: {len(user_stats)}, Projects: {len(project_stats)}")
+
         if report_type.lower() == "csv":
             # Generate CSV report
             output = io.StringIO()
@@ -1642,7 +1748,7 @@ def download_analytics_report():
             writer.writerow(["Total Sentences", total_sentences])
             writer.writerow(["Annotated Sentences", annotated_sentences])
             writer.writerow(["Annotation Rate", f"{(annotated_sentences/total_sentences*100):.1f}%" if total_sentences > 0 else "0%"])
-            writer.writerow(["Total MWE Annotations", total_annotations])
+            writer.writerow(["Total MWE Annotations", len(all_tags)])
             writer.writerow([])
             
             # User statistics
@@ -1651,13 +1757,13 @@ def download_analytics_report():
             for user in user_stats:
                 writer.writerow([
                     user["username"],
-                    user.get("full_name", "N/A"),
-                    user.get("role", "N/A"),
-                    user.get("organization", "N/A"),
+                    user["full_name"],
+                    user["role"],
+                    user["organization"],
                     user["total_sentences"],
                     user["annotated_sentences"],
                     user["total_annotations"],
-                    f"{(user['approval_rate']*100):.1f}%" if user['approval_rate'] > 0 else "0%"
+                    f"{user['approval_rate']:.1f}%" if user['approval_rate'] > 0 else "0%"
                 ])
             writer.writerow([])
             
@@ -1673,19 +1779,17 @@ def download_analytics_report():
                 ])
             writer.writerow([])
             
-            # Project statistics
+            # Project statistics - NOW CORRECTED
             writer.writerow(["PROJECT STATISTICS"])
             writer.writerow(["Project Name", "Language", "Total Sentences", "Annotated Sentences", "Completion Rate", "Created Date"])
             for project in project_stats:
-                
-                
                 writer.writerow([
                     project["project_name"],
-                    project.get("language", "Unknown"),
+                    project["language"],
                     project["total_sentences"],
                     project["annotated_sentences"],
-                    f"{(project['completion_rate']*100):.1f}%" if project['completion_rate'] > 0 else "0%",
-                    project["created_at"].strftime("%Y-%m-%d") if project.get("created_at") else "N/A"
+                    f"{project['completion_rate']:.1f}%" if project['completion_rate'] > 0 else "0%",
+                    project["created_date"]
                 ])
             
             response = Response(output.getvalue(), mimetype='text/csv')
@@ -1693,48 +1797,25 @@ def download_analytics_report():
             return response
             
         else:
-            # For PDF reports, convert ObjectIds to strings before serializing to JSON
-            
-            # Helper function to convert ObjectIds in a list of dicts
-            def sanitize_data(data):
-                sanitized_data = []
-                for item in data:
-                    new_item = {}
-                    for k, v in item.items():
-                        if isinstance(v, ObjectId):
-                            new_item[k] = str(v)
-                        elif isinstance(v, datetime):
-                            new_item[k] = v.strftime("%Y-%m-%d %H:%M:%S UTC")
-                        else:
-                            new_item[k] = v
-                    sanitized_data.append(new_item)
-                return sanitized_data
-
-            # Apply sanitization to all data sets
-            sanitized_user_stats = sanitize_data(user_stats)
-            sanitized_project_stats = sanitize_data(project_stats)
-            
-            # Note: mwe_stats does not need explicit sanitization because the aggregation pipeline removed the _id field (id: 0)
-            
+            # For PDF reports, we'll use the same data structure
             return jsonify({
                 "summary": {
                     "total_sentences": total_sentences,
                     "annotated_sentences": annotated_sentences,
                     "annotation_rate": (annotated_sentences/total_sentences*100) if total_sentences > 0 else 0,
-                    "total_annotations": total_annotations,
+                    "total_annotations": len(all_tags),
                     "report_generated": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
                 },
-                "user_statistics": sanitized_user_stats,
+                "user_statistics": user_stats,
                 "mwe_statistics": mwe_stats,
-                "project_statistics": sanitized_project_stats
+                "project_statistics": project_stats
             }), 200
             
     except Exception as e:
-        # NOTE: The print statement is crucial for debugging the 500 error on the server console.
         print(f"Error generating analytics report: {e}")
-        # Return a generic error message to the client
+        print(f"Error details: {traceback.format_exc()}")
         return jsonify({"error": "Internal server error"}), 500
-   
+    
 # --- Project Management Endpoints (UNCHANGED) ---
 
 @app.route("/api/projects", methods=["POST"])
@@ -2029,10 +2110,10 @@ def create_project_standalone_flask():
 @app.route("/api/projects", methods=["GET"])
 def get_projects():
     """
-    FIXED: Correctly counts unique sentences and annotations per project
+    FIXED: Correctly handles project ID matching between projects and sentences
     """
     try:
-        # Step 1: Get all project metadata
+        # Step 1: Get all project metadata and convert _id to string for matching
         projects_cursor = projects_collection.find({}, {
             "name": 1,
             "description": 1,
@@ -2040,13 +2121,18 @@ def get_projects():
             "created_at": 1
         }).sort("created_at", -1)
         
-        projects_map = {str(p["_id"]): p for p in projects_cursor}
+        # Create a mapping of string project IDs to project data
+        projects_map = {}
+        for p in projects_cursor:
+            project_id_str = str(p["_id"])
+            projects_map[project_id_str] = p
+        
         project_ids = list(projects_map.keys())
         
         if not project_ids:
             return jsonify([]), 200
 
-        # Step 2: CORRECTED Aggregation Pipeline
+        # Step 2: Aggregation Pipeline - match using string project IDs
         pipeline = [
             # Match only sentences belonging to the active projects
             {"$match": {"project_id": {"$in": project_ids}}},
@@ -2081,18 +2167,18 @@ def get_projects():
         projects_list = []
         
         # Step 3: Combine metadata with calculated statistics
-        for project_id, project in projects_map.items():
-            stats = stats_results.get(project_id, {})
+        for project_id_str, project in projects_map.items():
+            stats = stats_results.get(project_id_str, {})
             total_sentences = stats.get("total_sentences", 0)
             annotated_count = stats.get("annotated_count", 0)
             
             progress_percent = math.ceil((annotated_count / total_sentences) * 100) if total_sentences > 0 else 0
             
             # Get assigned users for this project
-            assigned_users = sentences_collection.distinct("username", {"project_id": project_id})
+            assigned_users = sentences_collection.distinct("username", {"project_id": project_id_str})
             
             projects_list.append({
-                "id": project_id,
+                "id": project_id_str,
                 "name": project["name"],
                 "description": project.get("description", "No description provided."),
                 "language": project.get("language", "N/A"),
@@ -2112,7 +2198,7 @@ def get_projects():
     except Exception as e:
         print(f"Error fetching projects (CORRECTED): {e}")
         return jsonify({"error": "Internal server error during project fetch"}), 500
- 
+    
    
 @app.route("/api/projects/<project_id>/assign_user", methods=["POST"])
 def assign_user_to_project(project_id):
@@ -2233,51 +2319,60 @@ def assign_user_to_project(project_id):
 
 @app.route("/api/projects/<project_id>/download", methods=["GET"])
 def download_project_data(project_id):
-    target_username = request.args.get("user")
     file_format = request.args.get("format", "Text")
 
-    if not target_username:
-        return jsonify({"error": "Target username is required for download."}), 400
-
     try:
+        print(f"DEBUG: Download request - project_id: {project_id}, format: {file_format}")
+        
+        # Verify the project exists
         project = projects_collection.find_one({"_id": ObjectId(project_id)})
         if not project:
+            print(f"DEBUG: Project not found with ID: {project_id}")
             return jsonify({"error": "Project not found."}), 404
         
-        # Fetch target user's email robustly for the text export header
-        user_doc = users_collection.find_one({"username": target_username})
-        # Use the actual email from the user doc for the 'Annotated by' field
-        annotator_email = user_doc.get("email", "unknown_email") if user_doc else "unknown_email"
+        print(f"DEBUG: Looking for all sentences in project: {project_id}")
         
-        # Fetch all sentences and their tags
+        # Fetch ALL sentences for this project (no user filter)
         pipeline = [
-            {"$match": {"project_id": project_id, "username": target_username}},
-            # CRITICAL FIX: Convert ObjectId to String for correct lookup join
+            {"$match": {"project_id": project_id}},
+            # Group by original_index to get unique sentences
+            {"$group": {
+                "_id": {
+                    "textContent": "$textContent",
+                    "original_index": "$original_index"
+                },
+                "sentence_data": {"$first": "$$ROOT"},
+                "all_annotators": {"$push": "$username"}
+            }},
+            {"$sort": {"_id.original_index": 1}},
+            # Convert ObjectId to String for lookup
             {"$addFields": {
-                "sentenceIdString": {"$toString": "$_id"}
+                "sentenceIdString": {"$toString": "$sentence_data._id"}
             }},
             {"$lookup": {
                 "from": "tags",
-                "localField": "sentenceIdString", # Use the new string field
+                "localField": "sentenceIdString",
                 "foreignField": "source_sentence_id",
                 "as": "annotations"
-            }},
-            {"$sort": {"original_index": 1}}
+            }}
         ]
-        annotated_sentences = list(sentences_collection.aggregate(pipeline))
+        
+        unique_sentences = list(sentences_collection.aggregate(pipeline))
+        
+        print(f"DEBUG: Found {len(unique_sentences)} unique sentences for download")
 
-        if not annotated_sentences:
-            return jsonify({"message": "No sentences assigned or processed found for this user/project."}), 404
+        if not unique_sentences:
+            return jsonify({"message": "No sentences found for this project."}), 404
 
-        # --- TXT Export Format (EXACT FORMAT REQUESTED) ---
+        # --- TXT Export Format ---
         if file_format.upper() == "TEXT":
             output = io.StringIO()
             output_lines = []
             
-            # IST timezone for annotation time display
             IST = ZoneInfo("Asia/Kolkata")
             
-            for sentence in annotated_sentences:
+            for item in unique_sentences:
+                sentence = item["sentence_data"]
                 is_annotated = sentence.get("is_annotated", False)
                 sentence_id = str(sentence["_id"])
                 
@@ -2288,31 +2383,29 @@ def download_project_data(project_id):
                 output_lines.append(f"Sentence ID: {sentence_id}, Text: {text_content}")
 
                 if is_annotated:
-                    # Collect all annotations for this sentence to print below the text
-                    for tag_doc in sentence.get('annotations', []):
-                        # Annotation details: Tag, Word/Phrase, Annotated by, Annotated on
+                    # Collect all annotations for this sentence
+                    for tag_doc in item.get('annotations', []):
                         tag_text = tag_doc.get('text', '').strip()
                         tag_label = tag_doc.get('tag', 'UNKNOWN_TAG')
+                        annotated_by = tag_doc.get('username', 'Unknown')
                         
                         # Date Formatting
                         annotation_dt_utc = tag_doc.get("annotation_date", datetime.utcnow())
                         if isinstance(annotation_dt_utc, str):
                             try:
-                                # Attempt to parse ISO format if stored as string
                                 annotation_dt_utc = datetime.fromisoformat(annotation_dt_utc.replace('Z', '+00:00'))
                             except:
                                 annotation_dt_utc = datetime.utcnow()
                         
-                        # Ensure datetime is timezone-aware for conversion
-                        if annotation_dt_utc.tzinfo is None or annotation_dt_utc.tzinfo.utcoffset(annotation_dt_utc) is None:
+                        if annotation_dt_utc.tzinfo is None:
                              annotation_dt_utc = annotation_dt_utc.replace(tzinfo=ZoneInfo("UTC"))
                              
                         annotation_dt_ist = annotation_dt_utc.astimezone(IST)
-                        annotation_dt_str = annotation_dt_ist.strftime('%Y-%m-%d') # Only date as requested (YYYY-MM-DD)
+                        annotation_dt_str = annotation_dt_ist.strftime('%Y-%m-%d')
 
-                        # Line 2: Tab-indented annotation details (EXACT FORMAT)
+                        # Line 2: Tab-indented annotation details
                         output_lines.append(
-                            f"\tAnnotation: {tag_label}, Word_Phrase: '{tag_text}', Annotated by: {annotator_email}, Annotated on: {annotation_dt_str}"
+                            f"\tAnnotation: {tag_label}, Word_Phrase: '{tag_text}', Annotated by: {annotated_by}, Annotated on: {annotation_dt_str}"
                         )
 
                 output_lines.append("") # Empty line for separation
@@ -2320,27 +2413,26 @@ def download_project_data(project_id):
             output.write('\n'.join(output_lines))
 
             response = Response(output.getvalue(), mimetype='text/plain')
-            response.headers["Content-Disposition"] = f"attachment; filename={project['name']}_{target_username}_annotations.txt"
+            response.headers["Content-Disposition"] = f"attachment; filename={project['name']}_all_annotations.txt"
             return response
 
-        # --- XML Export Format (EXACT FORMAT REQUESTED) ---
+        # --- XML Export Format ---
         elif file_format.upper() == "XML":
-            
-            all_user_sentences_cursor = sentences_collection.find({
-                "project_id": project_id, 
-                "username": target_username
-            }).sort("original_index", 1)
-            
-            all_user_sentences = list(all_user_sentences_cursor)
+            print(f"DEBUG: Generating XML export for {len(unique_sentences)} sentences")
             
             root = etree.Element("project")
             sentences_tag = etree.SubElement(root, "sentences")
             
-            annotation_map = {}
-            sentence_ids = [str(s["_id"]) for s in all_user_sentences]
+            # Collect all sentence IDs for tag lookup
+            all_sentence_ids = [str(item["sentence_data"]["_id"]) for item in unique_sentences]
             
-            # Fetch and format all tags
-            for tag in tags_collection.find({"source_sentence_id": {"$in": sentence_ids}}):
+            # Fetch all tags for these sentences
+            all_tags = list(tags_collection.find({"source_sentence_id": {"$in": all_sentence_ids}}))
+            print(f"DEBUG: Found {len(all_tags)} tags for XML export")
+            
+            # Create annotation map
+            annotation_map = {}
+            for tag in all_tags:
                 sid = tag.get("source_sentence_id")
                 if sid:
                     if sid not in annotation_map:
@@ -2353,30 +2445,32 @@ def download_project_data(project_id):
                         "id": str(tag["_id"]),
                         "word_phrase": tag['text'],
                         "annotation": tag['tag'],
-                        "annotated_by": tag.get('username'), 
+                        "annotated_by": tag.get('username', 'Unknown'), 
                         "annotated_on": annotated_on_date
                     }) 
             
-            for sentence in all_user_sentences:
-                project_id_str = sentence.get("project_id", project_id) 
+            for item in unique_sentences:
+                sentence = item["sentence_data"]
+                sentence_id_str = str(sentence["_id"])
                 
-                # EXACT ATTRIBUTES and NAMESPACE
+                # Create sentence element with attributes
                 sentence_tag = etree.SubElement(
                     sentences_tag, 
                     "sentence", 
-                    id=str(sentence["_id"]),
+                    id=sentence_id_str,
                     text=sentence["textContent"], 
                     isAnnotated="True" if sentence.get("is_annotated") else "False", 
-                    project_id=project_id_str 
+                    project_id=project_id
                 )
                 
                 annotations_tag = etree.SubElement(sentence_tag, "annotations")
                 
                 # Add annotations if they exist
-                tags_data = annotation_map.get(str(sentence["_id"]), [])
+                tags_data = annotation_map.get(sentence_id_str, [])
+                print(f"DEBUG: Sentence {sentence_id_str} has {len(tags_data)} tags")
                 
                 for tag_doc in tags_data:
-                    # EXACT TAG and ATTRIBUTES
+                    # Create annotation element
                     etree.SubElement(
                         annotations_tag, 
                         "annotation", 
@@ -2390,18 +2484,16 @@ def download_project_data(project_id):
             xml_string = etree.tostring(root, pretty_print=True, xml_declaration=True, encoding='UTF-8')
             
             response = Response(xml_string, mimetype='application/xml')
-            response.headers["Content-Disposition"] = f"attachment; filename={project['name']}_{target_username}_xml_export.xml"
+            response.headers["Content-Disposition"] = f"attachment; filename={project['name']}_all_annotations.xml"
             return response
-
 
         return jsonify({"error": "Invalid file format requested. Use 'Text' or 'XML'."}), 400
 
     except Exception as e:
-        # CRITICAL: Log the error and return a JSON failure response to prevent HTML output
         print(f"Backend CRASH during download: {e}")
+        print(f"Error details: {traceback.format_exc()}")
         return jsonify({"error": f"Download processing failed due to server error: {str(e)}"}), 500
-
-
+    
 @app.route("/sentences/<username>", methods=["GET"])
 def get_sentences(username):
     """
@@ -2649,7 +2741,12 @@ def get_project_sentences(project_id):
         from datetime import datetime
         project_name = "Unknown Project"
         try:
-            project = projects_collection.find_one({"_id": ObjectId(project_id)})
+            # To this:
+            try:
+                project = projects_collection.find_one({"_id": ObjectId(project_id)})
+            except:
+                # If ObjectId fails, try finding by string ID
+                project = projects_collection.find_one({"_id": project_id})
             if project:
                 project_name = project["name"]
         except:
