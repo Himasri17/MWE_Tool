@@ -32,7 +32,7 @@ export default function SentenceReviewPanel() {
     
     const sentencesPerPage = 6; 
 
-    // --- Utility: showSnackbar (Correctly defined within scope) ---
+    // --- Utility: showSnackbar ---
     const showSnackbar = (message, severity = 'info') => {
         setSnackbar({ open: true, message, severity });
     };
@@ -50,7 +50,6 @@ export default function SentenceReviewPanel() {
         setDebugInfo(null);
         
         try {
-            // This route should combine FINAL (Approved) and STAGED (Pending) tags
             const response = await fetch(`http://127.0.0.1:5001/api/projects/${projectId}/sentences?username=${targetUsername}`);
             
             if (!response.ok) {
@@ -95,7 +94,6 @@ export default function SentenceReviewPanel() {
         setIsReviewSubmitting(true);
 
         try {
-            // You'll need to create a backend endpoint for this
             const response = await fetch(`http://127.0.0.1:5001/reviewer/sentence/${sentenceId}/approve-without-tags`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -113,25 +111,11 @@ export default function SentenceReviewPanel() {
 
             showSnackbar('Sentence approved successfully (no tags).', 'success');
             
-            // Update local state
-            setSentences(prevSentences => prevSentences.map(s => {
-                if (s._id === sentenceId) {
-                    const updatedSentence = { 
-                        ...s, 
-                        review_status: 'Approved',
-                        is_annotated: true,
-                        review_comments: reviewComments
-                    };
-                    
-                    if (selectedSentenceData && selectedSentenceData._id === sentenceId) {
-                        setSelectedSentenceData(updatedSentence);
-                    }
-                    
-                    return updatedSentence;
-                }
-                return s;
-            }));
-
+            // --- AUTO-REFRESH INTEGRATION START (for sentence approval) ---
+            setSelectedSentenceData(null); 
+            await fetchSentencesForReview(false);
+            // --- AUTO-REFRESH INTEGRATION END ---
+            
         } catch (error) {
             console.error('Error approving sentence without tags:', error);
             showSnackbar(`Failed to approve sentence: ${error.message}`, 'error');
@@ -141,26 +125,26 @@ export default function SentenceReviewPanel() {
     };
 
     const updateSentenceStatus = useCallback((sentenceId) => {
+        // This function is less critical now that we rely on full refresh, 
+        // but it maintains local state consistency if needed.
         setSentences(prevSentences => prevSentences.map(s => {
             if (s._id === sentenceId) {
-                const pendingTags = s.tags.filter(tag => tag.review_status === 'Pending');
-                const approvedTags = s.tags.filter(tag => tag.review_status === 'Approved');
+                const hasPendingTags = s.tags.some(tag => tag.review_status === 'Pending');
+                const hasApprovedTags = s.tags.some(tag => tag.review_status === 'Approved');
                 
-                let newReviewStatus = 'Pending';
-                let newIsAnnotated = false;
+                let newReviewStatus = s.review_status || 'Pending';
+                let newIsAnnotated = s.is_annotated;
                 
-                if (pendingTags.length > 0) {
+                if (hasPendingTags) {
                     newReviewStatus = 'Pending';
                     newIsAnnotated = true;
-                } else if (approvedTags.length > 0) {
+                } else if (hasApprovedTags) {
                     newReviewStatus = 'Approved';
                     newIsAnnotated = true;
-                } else if (s.review_status === 'Approved' && s.tags.length === 0) {
-                    // Manually approved sentence without tags
-                    newReviewStatus = 'Approved';
-                    newIsAnnotated = true;
+                } else if (newIsAnnotated) {
+                    newReviewStatus = (newReviewStatus === 'Approved') ? 'Approved' : 'Rejected';
                 } else {
-                    newReviewStatus = 'Rejected';
+                    newReviewStatus = 'Pending';
                     newIsAnnotated = false;
                 }
                 
@@ -170,7 +154,6 @@ export default function SentenceReviewPanel() {
                     is_annotated: newIsAnnotated
                 };
                 
-                // Also update selected sentence if it's the current one
                 if (selectedSentenceData && selectedSentenceData._id === sentenceId) {
                     setSelectedSentenceData(updatedSentence);
                 }
@@ -216,22 +199,13 @@ export default function SentenceReviewPanel() {
 
             showSnackbar(`Tag '${tagText}' successfully ${action}d.`, 'success');
             
-            // Update local state: remove the tag from the selected sentence's tag array
-            setSentences(prevSentences => prevSentences.map(s => {
-                if (s._id === selectedSentenceData._id) {
-                    const updatedTags = s.tags.filter(t => t._id !== tagId);
-                    const updatedSentence = { ...s, tags: updatedTags };
-                    setSelectedSentenceData(updatedSentence);
+            // --- AUTO-REFRESH INTEGRATION START (for tag review) ---
+            // 1. Clear selected sentence data
+            setSelectedSentenceData(null); 
 
-                    // NEW: Update the sentence status after tag operation
-                    setTimeout(() => {
-                        updateSentenceStatus(selectedSentenceData._id);
-                    }, 100);
-                    
-                    return updatedSentence;
-                }
-                return s;
-            }));
+            // 2. Fetch the entire sentence list again (false for no loading spinner)
+            await fetchSentencesForReview(false);
+            // --- AUTO-REFRESH INTEGRATION END ---
             
             // Clear the comment field for the tag
             setTagComments(prev => { delete prev[tagId]; return { ...prev }; });
@@ -272,7 +246,7 @@ export default function SentenceReviewPanel() {
         const hasNoTagsAndPending = !hasTags && currentStatus === 'Pending';
 
         const statusColor = currentStatus === 'Approved' ? 'success' : 
-                            currentStatus === 'Rejected' ? 'error' : 'warning';
+                             currentStatus === 'Rejected' ? 'error' : 'warning';
                                 
         return (
             <Box>
@@ -338,10 +312,10 @@ export default function SentenceReviewPanel() {
                                 </Box>
                             )}
                         </Box>
-                    ) : (
+                   ) : (
                         <Box sx={{maxHeight: '30vh', overflowY: 'auto', pr: 1, mb: 2}}>
                             {sentenceData.tags.map((tag, index) => {
-                                const tagIsPending = tag.review_status === 'Pending' || tag.review_status === 'Staged/Pending Review';
+                                const tagIsPending = tag.review_status === 'Pending';
                                 const tagId = tag._id;
                                 const currentComment = tagComments[tagId] || tag.review_comments || '';
 
@@ -352,27 +326,14 @@ export default function SentenceReviewPanel() {
                                             <Box>
                                                 <Typography variant="body1" fontWeight="bold">
                                                     {tag.text} 
-                                                    <Chip 
-                                                        label={tag.tag} 
-                                                        size="small" 
-                                                        color={tagIsPending ? 'warning' : 'success'} 
-                                                        sx={{ ml: 1, height: 20, fontSize: '0.75rem' }} 
-                                                    />
-                                                    {/* Show the actual status */}
-                                                    <Chip 
-                                                        label={tag.review_status} 
-                                                        size="small" 
-                                                        variant="outlined"
-                                                        sx={{ ml: 0.5, height: 20, fontSize: '0.7rem' }} 
-                                                    />
+                                                    <Chip label={tag.tag} size="small" color={tagIsPending ? 'warning' : 'success'} sx={{ ml: 1, height: 20, fontSize: '0.75rem' }} />
                                                 </Typography>
                                                 <Typography variant="caption" color="text.secondary">
-                                                    By: {tag.username} | Annotated: {tag.annotation_date ? new Date(tag.annotation_date).toLocaleDateString() : 'N/A'}
-                                                    {tag.reviewed_by && ` | Reviewed by: ${tag.reviewed_by}`}
+                                                    By: {tag.username} | Status: <span style={{ color: tagIsPending ? theme.palette.warning.dark : theme.palette.success.dark }}>{tag.review_status}</span>
                                                 </Typography>
                                             </Box>
                                             
-                                            {/* Action buttons */}
+                                            {/* PER-TAG ACTION BUTTONS */}
                                             <Box sx={{ display: 'flex', gap: 1 }}>
                                                 {tagIsPending ? (
                                                     <>
@@ -403,7 +364,7 @@ export default function SentenceReviewPanel() {
                                             </Box>
                                         </Box>
 
-                                        {/* Comment field */}
+                                        {/* TAG-SPECIFIC COMMENT FIELD */}
                                         {(tagIsPending || (tag.review_comments && tag.review_comments.length > 0)) && (
                                             <TextField
                                                 fullWidth
@@ -445,17 +406,39 @@ export default function SentenceReviewPanel() {
     };
 
     const renderSentenceBox = (sentence) => {
-        // Determine accent color based on review status
-        const pendingTagsCount = sentence.tags.filter(t => t.review_status === 'Pending').length;
-        const finalTagsCount = sentence.tags.filter(t => t.review_status === 'Approved').length;
+        // --- Custom Pastel Color Definition ---
+        const PASTEL_GREEN_HEX = '#E8F5E9'; // Very light pastel green for background
+        const PASTEL_ACCENT_HEX = '#C8E6C9'; // Slightly deeper pastel green for border
 
-        let accentColor = theme.palette.grey[300]; // Default
+        // --- UPDATED LOGIC FOR VISUAL STATUS ---
+        const pendingTagsCount = sentence.tags.filter(t => t.review_status === 'Pending').length;
+        const approvedTagsCount = sentence.tags.filter(t => t.review_status === 'Approved').length;
+
+        // Determine the effective status for display on the list
+        let effectiveReviewStatus = sentence.review_status || 'Pending';
+        
+        // 1. If pending tags exist, it must be 'Pending'.
         if (pendingTagsCount > 0) {
-            accentColor = theme.palette.warning.main; // Yellow if any pending tags
-        } else if (finalTagsCount > 0) {
-            accentColor = theme.palette.success.main; // Green if all tags are approved
-        } else if (sentence.is_annotated) {
-            accentColor = theme.palette.error.main; // Red if annotated but no tags (error state)
+            effectiveReviewStatus = 'Pending'; 
+        } 
+        // 2. If no pending tags, AND either approved tags exist OR it's been marked annotated 
+        else if (approvedTagsCount > 0 || sentence.is_annotated) {
+            effectiveReviewStatus = 'Approved'; 
+        } 
+        // 3. Otherwise, use the DB status (usually 'Pending' for untouched sentences)
+        else {
+            effectiveReviewStatus = sentence.review_status || 'Pending';
+        }
+
+        // Determine accent color based on effective status
+        let accentColor = theme.palette.grey[300]; 
+        if (effectiveReviewStatus === 'Pending') {
+            accentColor = theme.palette.warning.main; 
+        } else if (effectiveReviewStatus === 'Approved') {
+            // Use the custom pastel accent color for the border.
+            accentColor = PASTEL_ACCENT_HEX; 
+        } else if (effectiveReviewStatus === 'Rejected') {
+            accentColor = theme.palette.error.main; 
         }
         
         const isSelected = selectedSentenceData?._id === sentence._id;
@@ -467,9 +450,11 @@ export default function SentenceReviewPanel() {
                 elevation={isSelected ? 3 : 1}
                 sx={{
                     p: 2, mb: 2, cursor: 'pointer', 
+                    // Use effectiveReviewStatus for background color logic
                     backgroundColor: isSelected 
                         ? theme.palette.action.selected 
-                        : (sentence.is_annotated ? theme.palette.success.light : theme.palette.common.white),
+                        // Use the custom pastel green for Approved background.
+                        : (effectiveReviewStatus === 'Approved' ? PASTEL_GREEN_HEX : theme.palette.common.white),
                     borderLeft: `5px solid ${accentColor}`,
                     borderRight: isSelected ? `2px solid ${accentColor}` : 'none',
                     '&:hover': { backgroundColor: theme.palette.action.hover, boxShadow: theme.shadows[2] },
@@ -488,9 +473,10 @@ export default function SentenceReviewPanel() {
                     </Typography>
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5, ml: 1 }}>
                         <Chip 
-                            label={sentence.review_status || 'Pending'}
+                            // Use the new effective status here
+                            label={effectiveReviewStatus}
                             size="small" 
-                            color={sentence.review_status === 'Approved' ? 'success' : sentence.review_status === 'Rejected' ? 'error' : 'warning'} 
+                            color={effectiveReviewStatus === 'Approved' ? 'success' : effectiveReviewStatus === 'Rejected' ? 'error' : 'warning'} 
                             variant="filled"
                             sx={{ minWidth: 80, fontWeight: 'bold' }}
                         />
@@ -507,6 +493,7 @@ export default function SentenceReviewPanel() {
             </Paper>
         );
     };
+    // --- END UPDATED LOGIC ---
 
     if (isLoading) {
         return (
@@ -526,10 +513,8 @@ export default function SentenceReviewPanel() {
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '60px', 
                 bgcolor: theme.palette.primary.light, color: 'black', p: 2, width: '100vw', boxSizing: 'border-box', margin: 0
             }}>
-                <Button variant="text" size="small" sx={{ color: 'black' }}>SHOW USER GUIDELINES</Button>
                 <Typography variant="h6" fontWeight={500} sx={{ mx: 1 }}>Multiword Expression Workbench</Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}> 
-                    <Button variant="text" size="small" sx={{ color: 'black' }}>SHOW ANNOTATION GUIDELINES</Button>
                     <Button variant="outlined" size="small" sx={{ color: 'black', borderColor: 'black' }} onClick={handleLogout}>LOG OUT</Button>
                 </Box>
             </Box>
@@ -564,7 +549,7 @@ export default function SentenceReviewPanel() {
                                 <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <Typography variant="body2" fontWeight="bold">📊 Session Overview</Typography>
-                                        <Typography variant="caption" color="text.secondary">{new Date().toLocaleTimeString()}</Typography>
+                                        
                                     </Box>
                                     <Box sx={{ display: 'flex', gap: 2, mt: 1, flexWrap: 'wrap' }}>
                                         <Chip label={`Total: ${debugInfo.totalSentences}`} size="small" variant="outlined" />
@@ -614,7 +599,7 @@ export default function SentenceReviewPanel() {
                 </Box>
             </Box>
 
-            {/* Snackbar */}
+            /* Snackbar */
             <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={handleCloseSnackbar}>
                 <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
                     {snackbar.message}

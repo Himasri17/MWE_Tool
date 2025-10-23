@@ -364,9 +364,7 @@ export default function ProjectSentencesReview() {
                                         <Typography variant="body2" fontWeight="bold">
                                             📊 Session Overview
                                         </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            {new Date().toLocaleTimeString()}
-                                        </Typography>
+                                        
                                     </Box>
                                     <Box sx={{ display: 'flex', gap: 2, mt: 1, flexWrap: 'wrap' }}>
                                         <Chip label={`Total: ${debugInfo.totalSentences}`} size="small" variant="outlined" />

@@ -506,6 +506,7 @@ def extract_text_from_file(file, file_extension):
 def update_sentence_review_status(sentence_id):
     """Update sentence review status based on its tags"""
     try:
+        from bson.objectid import ObjectId
         # Count remaining staged tags for this sentence
         remaining_staged_tags = staged_tags_collection.count_documents({
             "source_sentence_id": sentence_id
@@ -523,24 +524,26 @@ def update_sentence_review_status(sentence_id):
             
         current_status = sentence.get('review_status', 'Pending')
         
+        # Determine is_annotated based on the existence of any tags or prior manual setting
+        is_annotated = (remaining_staged_tags > 0) or (approved_tags_count > 0) or sentence.get('is_annotated', False)
+        
         # NEW LOGIC: Determine the correct status
         if remaining_staged_tags > 0:
-            # Still has pending tags - keep as Pending
+            # Still has pending tags - remains in review
             new_status = "Pending"
-            is_annotated = True
         elif approved_tags_count > 0:
             # All tags processed and at least one approved
             new_status = "Approved"
-            is_annotated = True
         elif current_status == "Approved" and approved_tags_count == 0 and remaining_staged_tags == 0:
             # Manually approved sentence without tags - keep approved
             new_status = "Approved"
-            is_annotated = True
         else:
-            # All tags rejected or no tags
-            new_status = "Rejected"
-            is_annotated = False
-            
+            # All tags rejected or no tags, so default to Rejected or keep Pending if not reviewed
+            if is_annotated and approved_tags_count == 0:
+                 new_status = "Rejected" # All annotations were rejected
+            else:
+                 new_status = "Pending" # Default for unannotated/unreviewed
+
         # Update the sentence
         sentences_collection.update_one(
             {"_id": ObjectId(sentence_id)},
@@ -1674,6 +1677,7 @@ def download_analytics_report():
             writer.writerow(["PROJECT STATISTICS"])
             writer.writerow(["Project Name", "Language", "Total Sentences", "Annotated Sentences", "Completion Rate", "Created Date"])
             for project in project_stats:
+                
                 writer.writerow([
                     project["project_name"],
                     project.get("language", "Unknown"),
@@ -1688,8 +1692,29 @@ def download_analytics_report():
             return response
             
         else:
-            # For PDF reports, you would typically use a library like ReportLab
-            # Here's a basic implementation that returns JSON for PDF generation on frontend
+            # For PDF reports, convert ObjectIds to strings before serializing to JSON
+            
+            # Helper function to convert ObjectIds in a list of dicts
+            def sanitize_data(data):
+                sanitized_data = []
+                for item in data:
+                    new_item = {}
+                    for k, v in item.items():
+                        if isinstance(v, ObjectId):
+                            new_item[k] = str(v)
+                        elif isinstance(v, datetime):
+                            new_item[k] = v.strftime("%Y-%m-%d %H:%M:%S UTC")
+                        else:
+                            new_item[k] = v
+                    sanitized_data.append(new_item)
+                return sanitized_data
+
+            # Apply sanitization to all data sets
+            sanitized_user_stats = sanitize_data(user_stats)
+            sanitized_project_stats = sanitize_data(project_stats)
+            
+            # Note: mwe_stats does not need explicit sanitization because the aggregation pipeline removed the _id field (id: 0)
+            
             return jsonify({
                 "summary": {
                     "total_sentences": total_sentences,
@@ -1698,58 +1723,15 @@ def download_analytics_report():
                     "total_annotations": total_annotations,
                     "report_generated": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
                 },
-                "user_statistics": user_stats,
+                "user_statistics": sanitized_user_stats,
                 "mwe_statistics": mwe_stats,
-                "project_statistics": project_stats
+                "project_statistics": sanitized_project_stats
             }), 200
             
     except Exception as e:
+        # NOTE: The print statement is crucial for debugging the 500 error on the server console.
         print(f"Error generating analytics report: {e}")
-        return jsonify({"error": "Internal server error"}), 500
-
-
-@app.route("/api/analytics/annotation-timeline", methods=["GET"])
-def get_annotation_timeline():
-    """Get annotation activity over time for timeline visualization"""
-    try:
-        pipeline = [
-            {"$group": {
-                "_id": {
-                    "year": {"$year": "$annotation_date"},
-                    "month": {"$month": "$annotation_date"},
-                    "day": {"$dayOfMonth": "$annotation_date"}
-                },
-                "count": {"$sum": 1},
-                "unique_annotators": {"$addToSet": "$username"},
-                "mwe_types": {"$addToSet": "$tag"}
-            }},
-            {"$project": {
-                "date": {
-                    "$dateFromParts": {
-                        "year": "$_id.year",
-                        "month": "$_id.month",
-                        "day": "$_id.day"
-                    }
-                },
-                "count": 1,
-                "unique_annotators_count": {"$size": "$unique_annotators"},
-                "unique_mwe_types": {"$size": "$mwe_types"},
-                "_id": 0
-            }},
-            {"$sort": {"date": 1}}
-        ]
-        
-        timeline_data = list(tags_collection.aggregate(pipeline))
-        
-        # Format dates for frontend
-        for item in timeline_data:
-            if isinstance(item["date"], datetime):
-                item["date"] = item["date"].strftime("%Y-%m-%d")
-        
-        return jsonify(timeline_data), 200
-        
-    except Exception as e:
-        print(f"Error fetching annotation timeline: {e}")
+        # Return a generic error message to the client
         return jsonify({"error": "Internal server error"}), 500
    
 # --- Project Management Endpoints (UNCHANGED) ---
@@ -2662,6 +2644,8 @@ def get_project_sentences(project_id):
     Fetches sentences and their tags (BOTH final and staged) for a specific project ID and user.
     """
     try:
+        from bson.objectid import ObjectId
+        from datetime import datetime
         project_name = "Unknown Project"
         try:
             project = projects_collection.find_one({"_id": ObjectId(project_id)})
@@ -2702,9 +2686,20 @@ def get_project_sentences(project_id):
             
             # Fetch STAGED tags for this sentence using your existing route logic
             staged_tags = list(staged_tags_collection.find({
-                "source_sentence_id": sentence_id_str  # Note: using source_sentence_id, not sentence_id
+                "source_sentence_id": sentence_id_str 
             }))
             
+            # --- BEGIN: MODIFIED LOGIC BLOCK ---
+            
+            # Determine if the annotator has touched the sentence at all
+            is_annotated_from_tags = len(s.get("final_tags", [])) > 0 or len(staged_tags) > 0
+            
+            # Use the DB status, but if the sentence is now 'annotated' and previously was unreviewed ('Pending'), 
+            # the frontend will visually default it to 'Approved' unless staged tags exist.
+            overall_review_status = s.get("review_status", "Pending")
+            
+            # --- END: MODIFIED LOGIC BLOCK ---
+
             # Combine final tags and staged tags
             all_tags = []
             
@@ -2717,10 +2712,9 @@ def get_project_sentences(project_id):
                     "annotation_date": tag.get("annotation_date"),
                     "mweId": tag.get("mweId"),
                     "_id": str(tag["_id"]),
-                    "review_status": "Approved",  # Final tags are approved
+                    "review_status": "Approved", 
                     "review_comments": tag.get("review_comments", "")
                 }
-                # Format date if present
                 if tag_data["annotation_date"] and isinstance(tag_data["annotation_date"], datetime):
                     tag_data["annotated_on"] = tag_data["annotation_date"].strftime('%Y-%m-%d')
                 all_tags.append(tag_data)
@@ -2734,10 +2728,14 @@ def get_project_sentences(project_id):
                     "annotation_date": tag.get("annotation_date"),
                     "mweId": tag.get("mweId"),
                     "_id": str(tag["_id"]),
-                    "review_status": "Pending",  # Staged tags are pending
                     "review_comments": tag.get("review_comments", "")
                 }
-                # Format date if present
+
+                if tag_data["username"] == "auto_annotator_system": 
+                    tag_data["review_status"] = "Approved" 
+                else:
+                    tag_data["review_status"] = "Pending"
+
                 if tag_data["annotation_date"] and isinstance(tag_data["annotation_date"], datetime):
                     tag_data["annotated_on"] = tag_data["annotation_date"].strftime('%Y-%m-%d')
                 all_tags.append(tag_data)
@@ -2746,15 +2744,17 @@ def get_project_sentences(project_id):
             sentence_data = {
                 "_id": str(s["_id"]),
                 "textContent": s["textContent"],
-                "is_annotated": s.get("is_annotated", False),
+                # Use calculated value if DB flag isn't set
+                "is_annotated": s.get("is_annotated", False) or is_annotated_from_tags,
                 "original_index": s.get("original_index"),
                 "project_id": s.get("project_id"),
                 "username": s.get("username"),
                 "annotation_datetime": s.get("annotation_datetime"),
                 "annotation_email": s.get("annotation_email"),
-                "tags": all_tags,  # Now includes both final and staged tags
-                "review_status": s.get("review_status", "Pending")
+                "tags": all_tags,
+                "review_status": overall_review_status
             }
+            
             
             project_sentences.append(sentence_data)
             
@@ -2914,7 +2914,7 @@ def approve_tag(tag_id):
         staged_tag = staged_tags_collection.find_one({"_id": ObjectId(tag_id)})
         if not staged_tag:
             return jsonify({"message": "Staged tag not found or already reviewed."}), 404
-        
+        sentence_id = staged_tag.get('source_sentence_id')
         # Create final tag with updated status
         final_tag = {
             'tag': staged_tag.get('tag'),
@@ -2934,7 +2934,16 @@ def approve_tag(tag_id):
         
         # Remove from staged collection
         staged_tags_collection.delete_one({"_id": ObjectId(tag_id)})
+        remaining_staged_tags = staged_tags_collection.count_documents(
+            {"source_sentence_id": sentence_id}
+        )
         
+        
+        if remaining_staged_tags == 0:
+            sentences_collection.update_one(
+                {"_id": ObjectId(sentence_id)},
+                {"$set": {"review_status": "Approved", "is_annotated": True}}
+            )
         # Update sentence status
         update_sentence_review_status(final_tag.get('source_sentence_id'))
         
