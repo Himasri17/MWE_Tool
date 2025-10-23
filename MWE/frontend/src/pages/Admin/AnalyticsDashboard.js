@@ -18,8 +18,10 @@ import {
     Folder as ProjectIcon,
     Timeline as TimelineIcon
 } from '@mui/icons-material';
+import { authFetch } from '../../utils/api';
 import jsPDF from 'jspdf';
 import NetworkGraph from './NetworkGraph';
+
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
@@ -62,10 +64,10 @@ const AnalyticsDashboard = () => {
         console.log("=== FETCHING INITIAL ANALYTICS DATA ===");
         
         const [mweRes, networkRes, timelineRes] = await Promise.all([
-            fetch(`${API_BASE_URL}/api/analytics/mwe-distribution`),
-            fetch(`${API_BASE_URL}/api/analytics/mwe-network`),
-            fetch(`${API_BASE_URL}/api/analytics/annotation-timeline`)
-        ]);
+        authFetch(`${API_BASE_URL}/api/analytics/mwe-distribution`), // <-- Use authFetch
+        authFetch(`${API_BASE_URL}/api/analytics/mwe-network`),       // <-- Use authFetch
+        authFetch(`${API_BASE_URL}/api/analytics/annotation-timeline`) // <-- Use authFetch
+    ]);
         
         console.log("MWE Distribution Response:", mweRes.status, mweRes.ok);
         console.log("Network Response:", networkRes.status, networkRes.ok);

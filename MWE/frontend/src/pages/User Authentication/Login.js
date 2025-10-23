@@ -35,6 +35,9 @@ export default function Login() {
             const data = await response.json();
             
             if (!response.ok) {
+                localStorage.setItem('jwt_token', data.token); // Store the token
+                localStorage.setItem('userRole', data.role);
+                localStorage.setItem('reviewerUsername', data.username);
                 const message = data.error || data.message || "Login failed. Please try again.";
                 
                 if (message.includes("awaiting admin approval")) {

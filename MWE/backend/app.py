@@ -8,6 +8,7 @@ from flask_mail import Mail, Message
 from bson import ObjectId
 from pymongo import MongoClient
 import bcrypt
+import jwt
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import PyPDF2
@@ -57,7 +58,9 @@ org_admins_collection = db["org_admins"]
 staged_tags_collection = db["staged_tags"] # NEW: Temporary storage for unreviewed tags
 # --- Helper Functions (UNCHANGED) ---
 
-
+# --- JWT Configuration ---
+app.config['JWT_SECRET_KEY'] = 'your_super_secret_key_change_me' # IMPORTANT: Change this!
+JWT_ALGORITHM = 'HS256'
 
 # --- Configuration (UNCHANGED) ---
 UPLOAD_FOLDER = 'feedback_uploads'
@@ -79,6 +82,57 @@ if not os.path.exists(UPLOAD_FOLDER):
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def generate_jwt(username, role):
+    """Generates a JWT token valid for 24 hours."""
+    payload = {
+        'exp': datetime.utcnow() + timedelta(days=1), # Expiration time
+        'iat': datetime.utcnow(),                     # Issued at time
+        'sub': username,                              # Subject (username)
+        'role': role                                  # User role
+    }
+    return jwt.encode(payload, app.config['JWT_SECRET_KEY'], algorithm=JWT_ALGORITHM)
+
+# Helper function to validate a token
+def decode_jwt(token):
+    """Decodes a JWT token and returns the payload if valid, or None if expired/invalid."""
+    try:
+        payload = jwt.decode(token, app.config['JWT_SECRET_KEY'], algorithms=[JWT_ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        return {'error': 'Token expired'}
+    except jwt.InvalidTokenError:
+        return {'error': 'Invalid token'}
+
+# Decorator to protect routes
+from functools import wraps
+from flask import request, jsonify
+
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        # JWT is typically passed in the Authorization header
+        if 'Authorization' in request.headers:
+            auth_header = request.headers['Authorization']
+            if auth_header.startswith('Bearer '):
+                token = auth_header.split(' ')[1]
+
+        if not token:
+            return jsonify({'message': 'Token is missing!'}), 401
+
+        try:
+            current_user_payload = decode_jwt(token)
+            if 'error' in current_user_payload:
+                 return jsonify({'message': current_user_payload['error']}), 401
+                 
+            request.current_user = current_user_payload['sub'] # Attach username to request
+        except:
+            return jsonify({'message': 'Token is invalid or corrupted!'}), 401
+
+        return f(*args, **kwargs)
+
+    return decorated
 
 
 @app.route('/feedback_uploads/<filename>')
@@ -863,12 +917,15 @@ def login():
     if user.get("role", "").lower() != "admin" and not user.get("is_approved", False):
         return jsonify({"error": "Account awaiting admin approval", "message": "Your account is pending admin approval."}), 403
     
+    token = generate_jwt(username_or_email, user.get("role", "user"))
+
     log_action_and_update_report(username_or_email, 'Login')
     
     return jsonify({
         "message": "Login successful", 
         "username": username_or_email, 
-        "role": user.get("role", "user")
+        "role": user.get("role", "user"),
+        "token": token
     })
 
 
@@ -1059,6 +1116,7 @@ Sentence Annotation System Team
 # --- NEW ADMIN ROUTES FOR APPROVAL (UNCHANGED) ---
 
 @app.route("/admin/pending-users", methods=["GET"])
+@token_required
 def get_pending_users():
     """Fetches list of users who are not yet approved and not rejected (excluding admins). (UNCHANGED)"""
     try:
@@ -1222,6 +1280,7 @@ def get_user_data(username):
 # --- Visualization & Analytics Endpoints (UNCHANGED) ---
 
 @app.route("/api/analytics/mwe-distribution", methods=["GET"])
+@token_required
 def get_mwe_distribution():
     """Get MWE type distribution across various dimensions - IMPROVED SIMPLIFIED VERSION"""
     try:
