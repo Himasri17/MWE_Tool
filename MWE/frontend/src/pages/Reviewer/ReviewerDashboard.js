@@ -18,7 +18,13 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 
 
 const getReviewerUsername = () => { 
-    return localStorage.getItem('reviewerUsername') || 'reviewer@example.com';
+    const reviewerEmail = localStorage.getItem('reviewerUsername') || 'reviewer@example.com';
+    
+    // Split the email at the '@' symbol and return the first part (the username)
+    const parts = reviewerEmail.split('@');
+    
+    // Return the username part (or the full email if no '@' was found)
+    return parts[0] || reviewerEmail;
 }
 
 

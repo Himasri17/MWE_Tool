@@ -37,8 +37,8 @@ function App() {
                     element={<ProjectSentencesReview />} 
                 />
 
-                {/* NEW REVIEWER ROUTES */}
-                <Route path="/reviewer/dashboard" element={<ReviewerDashboard />} />
+                {/* REVIEWER ROUTES */}
+                <Route path="/reviewer/:username" element={<ReviewerDashboard />} />
                 <Route 
                 path="/reviewer/:username/project/:projectId/user/:targetUsername" 
                 element={<SentenceReviewPanel />} 

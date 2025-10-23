@@ -1678,6 +1678,7 @@ def download_analytics_report():
             writer.writerow(["Project Name", "Language", "Total Sentences", "Annotated Sentences", "Completion Rate", "Created Date"])
             for project in project_stats:
                 
+                
                 writer.writerow([
                     project["project_name"],
                     project.get("language", "Unknown"),
@@ -3034,57 +3035,7 @@ def update_sentence_status(sentence_id):
         
     return jsonify({"message": "Status updated successfully"})
 
-@app.route('/reviewer/sentence/<sentence_id>/approve-without-tags', methods=['PUT'])
-def approve_sentence_without_tags(sentence_id):
-    """
-    Approve a sentence that has no tags (mark it as reviewed and approved)
-    """
-    try:
-        data = request.json
-        reviewer_username = data.get('reviewerUsername')
-        comments = data.get('comments', '')
-        
-        if not reviewer_username:
-            return jsonify({"error": "Reviewer username is required"}), 400
 
-        # Find the sentence
-        sentence = sentences_collection.find_one({"_id": ObjectId(sentence_id)})
-        if not sentence:
-            return jsonify({"message": "Sentence not found"}), 404
-
-        # Check if sentence actually has any tags (final or staged)
-        final_tags_count = tags_collection.count_documents({"source_sentence_id": sentence_id})
-        staged_tags_count = staged_tags_collection.count_documents({"source_sentence_id": sentence_id})
-        
-        if final_tags_count > 0 or staged_tags_count > 0:
-            return jsonify({"message": "Sentence has existing tags. Use tag-specific approval instead."}), 400
-
-        # Update the sentence status
-        update_result = sentences_collection.update_one(
-            {"_id": ObjectId(sentence_id)},
-            {"$set": {
-                "review_status": "Approved",
-                "is_annotated": True,
-                "review_comments": comments,
-                "annotation_email": reviewer_username,
-                "annotation_datetime": datetime.utcnow()
-            }}
-        )
-
-        if update_result.matched_count == 0:
-            return jsonify({"message": "Sentence not found"}), 404
-
-        # Log the action
-        log_action_and_update_report(
-            reviewer_username, 
-            f"Approved sentence without tags: '{sentence.get('textContent', '')}'"
-        )
-
-        return jsonify({"message": "Sentence approved successfully (no tags)"}), 200
-
-    except Exception as e:
-        print(f"Error approving sentence without tags: {e}")
-        return jsonify({"error": "Internal server error during sentence approval"}), 500
     
 @app.route('/stats', methods=["GET"])
 def get_stats():

@@ -88,41 +88,7 @@ export default function SentenceReviewPanel() {
         fetchSentencesForReview();
     }, [fetchSentencesForReview]);
 
-    const handleApproveSentenceWithoutTags = async (sentenceId) => {
-        if (!sentenceId) return;
-        
-        setIsReviewSubmitting(true);
-
-        try {
-            const response = await fetch(`http://127.0.0.1:5001/reviewer/sentence/${sentenceId}/approve-without-tags`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    reviewerUsername: username,
-                    comments: reviewComments 
-                })
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Failed to approve sentence without tags.');
-            }
-
-            showSnackbar('Sentence approved successfully (no tags).', 'success');
-            
-            // --- AUTO-REFRESH INTEGRATION START (for sentence approval) ---
-            setSelectedSentenceData(null); 
-            await fetchSentencesForReview(false);
-            // --- AUTO-REFRESH INTEGRATION END ---
-            
-        } catch (error) {
-            console.error('Error approving sentence without tags:', error);
-            showSnackbar(`Failed to approve sentence: ${error.message}`, 'error');
-        } finally {
-            setIsReviewSubmitting(false);
-        }
-    };
+   
 
     const updateSentenceStatus = useCallback((sentenceId) => {
         // This function is less critical now that we rely on full refresh, 
@@ -291,26 +257,7 @@ export default function SentenceReviewPanel() {
                                 No tags exist for this sentence (staged or approved).
                             </Alert>
                             
-                            {/* NEW: Approve Sentence Button for sentences without tags */}
-                            {hasNoTagsAndPending && (
-                                <Box sx={{ mb: 3, p: 2, border: `2px dashed ${theme.palette.info.main}`, borderRadius: 1 }}>
-                                    <Typography variant="subtitle2" color="info.main" gutterBottom>
-                                        Approve this sentence without annotations?
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                        This sentence has been reviewed and doesn't require any Multiword Expression annotations.
-                                    </Typography>
-                                    <Button
-                                        variant="contained"
-                                        color="success"
-                                        startIcon={<CheckCircleIcon />}
-                                        onClick={() => handleApproveSentenceWithoutTags(sentenceData._id)}
-                                        disabled={isReviewSubmitting}
-                                    >
-                                        {isReviewSubmitting ? 'Approving...' : 'Approve Sentence (No Tags)'}
-                                    </Button>
-                                </Box>
-                            )}
+                            
                         </Box>
                    ) : (
                         <Box sx={{maxHeight: '30vh', overflowY: 'auto', pr: 1, mb: 2}}>
@@ -389,18 +336,7 @@ export default function SentenceReviewPanel() {
                 <Divider sx={{ my: 3 }} />
 
                 {/* REVIEWER NOTES TEXT FIELD */}
-                <Typography variant="h6" gutterBottom>Reviewer Notes</Typography>
-
-                <TextField
-                    fullWidth
-                    multiline
-                    rows={2}
-                    value={reviewComments}
-                    onChange={(e) => setReviewComments(e.target.value)}
-                    placeholder="General notes on this sentence assignment..."
-                    variant="outlined"
-                    disabled={isReviewSubmitting}
-                />
+                
             </Box>
         );
     };

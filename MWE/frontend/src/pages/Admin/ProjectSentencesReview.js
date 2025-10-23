@@ -314,10 +314,10 @@ export default function ProjectSentencesReview() {
                 boxSizing: 'border-box',
                 margin: 0
             }}>
-                <Button variant="text" size="small" sx={{ color: 'black' }}>SHOW USER GUIDELINES</Button>
+                
                 <Typography variant="h6" fontWeight={500} sx={{ mx: 1 }}>Multiword Expression Workbench</Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}> 
-                    <Button variant="text" size="small" sx={{ color: 'black' }}>SHOW ANNOTATION GUIDELINES</Button>
+                    <Typography variant="body1">Admin: {username}</Typography>
                     <Button variant="outlined" size="small" sx={{ color: 'black', borderColor: 'black' }} onClick={handleLogout}>LOG OUT</Button>
                 </Box>
             </Box>
