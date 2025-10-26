@@ -1,6 +1,6 @@
 // src/App.js
 import React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import HomePage from "./pages/HomePage"; // Import HomePage
 import Login from "./pages/User Authentication/Login";
 import Register from "./pages/User Authentication/Register";
@@ -19,7 +19,7 @@ function App() {
     return (
         <BrowserRouter>
             <Routes>
-                {/* 1. Root Path: Now shows HomePage instead of redirecting to login */}
+                
                 <Route path="/" element={<HomePage />} />
                 
                 {/* 2. Authentication Routes */}

@@ -11,14 +11,13 @@ import {
     Person, Schedule, Assignment, Label, Download,
     FilterList, Refresh, Visibility, CalendarToday
 } from '@mui/icons-material';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { getAuthHeaders } from '../../components/authUtils';
 import Navbar from '../../components/Navbar'; // Add this import
 
 
 export default function UserLogbook() {
     const { username } = useParams();
-    const navigate = useNavigate();
     const theme = useTheme();
 
     // State management

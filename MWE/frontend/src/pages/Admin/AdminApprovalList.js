@@ -10,6 +10,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import CancelIcon from '@mui/icons-material/Cancel';
 import Navbar from '../../components/Navbar'; 
+import { getToken } from '../../components/authUtils'; // Import getToken function
 
 export default function AdminApprovalList() {
     const [pendingUsers, setPendingUsers] = useState([]);
@@ -26,8 +27,23 @@ export default function AdminApprovalList() {
     const fetchPendingUsers = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch("http://127.0.0.1:5001/admin/pending-users");
-            if (!res.ok) throw new Error("Failed to fetch pending users. Unauthorized or API error.");
+            const token = getToken(); // Get the JWT token
+            if (!token) {
+                throw new Error("No authentication token found. Please log in again.");
+            }
+
+            const res = await fetch("http://127.0.0.1:5001/admin/pending-users", {
+                headers: {
+                    'Authorization': `Bearer ${token}` // Add Authorization header
+                }
+            });
+            
+            if (!res.ok) {
+                if (res.status === 401) {
+                    throw new Error("Authentication failed. Please log in again.");
+                }
+                throw new Error("Failed to fetch pending users. Unauthorized or API error.");
+            }
             
             const data = await res.json();
             setPendingUsers(data);
@@ -60,13 +76,16 @@ export default function AdminApprovalList() {
         
         setActionInProgress(true);
         try {
+            const token = getToken(); // Get the JWT token
+            
             const res = await fetch(`http://127.0.0.1:5001/admin/approve-user/${userId}`, { 
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` // Add Authorization header
                 },
                 body: JSON.stringify({
-                    adminUsername: 'admin' // You might want to pass the actual admin username
+                    adminUsername: username // Use the actual admin username from URL params
                 })
             });
             
@@ -75,12 +94,15 @@ export default function AdminApprovalList() {
                 setPendingUsers(prev => prev.filter(user => user._id !== userId));
                 showSnackbar(`User ${userEmail} approved successfully!`, 'success');
             } else {
+                if (res.status === 401) {
+                    throw new Error("Authentication failed. Please log in again.");
+                }
                 const errorData = await res.json().catch(() => ({ message: 'Server failed to approve.' }));
                 showSnackbar(`Approval failed: ${errorData.message}`, 'error');
             }
         } catch (error) {
             console.error("Approval API call failed:", error);
-            showSnackbar("Network error during approval.", 'error');
+            showSnackbar(`Approval failed: ${error.message}`, 'error');
         } finally {
             setActionInProgress(false);
         }
@@ -104,13 +126,16 @@ export default function AdminApprovalList() {
         
         setActionInProgress(true);
         try {
+            const token = getToken(); // Get the JWT token
+            
             const res = await fetch(`http://127.0.0.1:5001/admin/reject-user/${selectedUser._id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` // Add Authorization header
                 },
                 body: JSON.stringify({
-                    adminUsername: 'admin', // You might want to pass the actual admin username
+                    adminUsername: username, // Use the actual admin username from URL params
                     rejectionReason: rejectionReason || 'No reason provided'
                 })
             });
@@ -121,12 +146,15 @@ export default function AdminApprovalList() {
                 showSnackbar(`User ${selectedUser.email} rejected successfully!`, 'success');
                 closeRejectDialog();
             } else {
+                if (res.status === 401) {
+                    throw new Error("Authentication failed. Please log in again.");
+                }
                 const errorData = await res.json().catch(() => ({ message: 'Server failed to reject.' }));
                 showSnackbar(`Rejection failed: ${errorData.message}`, 'error');
             }
         } catch (error) {
             console.error("Rejection API call failed:", error);
-            showSnackbar("Network error during rejection.", 'error');
+            showSnackbar(`Rejection failed: ${error.message}`, 'error');
         } finally {
             setActionInProgress(false);
         }

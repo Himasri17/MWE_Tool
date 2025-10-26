@@ -53,8 +53,7 @@ const API_BASE_URL = 'http://127.0.0.1:5001';
 const AnalyticsDashboard = () => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-    const isTablet = useMediaQuery(theme.breakpoints.down('lg'));
-
+    
     // State management
     const [activeTab, setActiveTab] = useState(0);
     const [analyticsData, setAnalyticsData] = useState(null);

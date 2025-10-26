@@ -24,54 +24,61 @@ export default function Login() {
     const theme = useTheme();
 
     const handleLogin = async (event) => {
-        event.preventDefault();
-        setError('');
-        setIsLoading(true);
+    event.preventDefault();
+    setError('');
+    
+    // Add validation for empty fields
+    if (!username.trim() || !password.trim()) {
+        setError('Please fill in all required fields');
+        return;
+    }
+    
+    setIsLoading(true);
 
-        try {
-            const response = await fetch('http://127.0.0.1:5001/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password }),
-            });
+    try {
+        const response = await fetch('http://127.0.0.1:5001/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+        });
 
-            const data = await response.json();
+        const data = await response.json();
+        
+        if (!response.ok) {
+            const message = data.error || data.message || "Login failed. Please try again.";
             
-            if (!response.ok) {
-                const message = data.error || data.message || "Login failed. Please try again.";
-                
-                if (message.includes("awaiting admin approval")) {
-                    setError("Your account is pending admin approval. You will be notified by email when activated.");
-                } else {
-                    setError(message);
-                }
-                return;
+            if (message.includes("awaiting admin approval")) {
+                setError("Your account is pending admin approval. You will be notified by email when activated.");
+            } else {
+                setError(message);
             }
-
-            // Store JWT token
-            if (data.token) {
-                setToken(data.token);
-                console.log('JWT token stored successfully');
-            }
-
-            // Login successful and approved: Conditional Navigation
-            if (data.role === "admin") {
-                navigate(`/admin/${username}`);
-            }
-            else if (data.role === "reviewer") {
-                navigate(`/reviewer/dashboard`);
-            }
-            else {
-                navigate(`/dashboard/${username}`);
-            }
-
-        } catch (err) {
-            setError('Network error. Please try again later.');
-            console.error('Network error:', err);
-        } finally {
-            setIsLoading(false);
+            return;
         }
-    };
+
+        // Store JWT token
+        if (data.token) {
+            setToken(data.token);
+            console.log('JWT token stored successfully');
+        }
+
+        // Login successful and approved: Conditional Navigation
+        if (data.role === "admin") {
+            navigate(`/admin/${username}`);
+        }
+        else if (data.role === "reviewer") {
+            navigate(`/reviewer/dashboard`);
+        }
+        else {
+            navigate(`/dashboard/${username}`);
+        }
+
+    } catch (err) {
+        setError('Network error. Please try again later.');
+        console.error('Network error:', err);
+    } finally {
+        setIsLoading(false);
+    }
+};
 
     const handleClickShowPassword = () => { setShowPassword(!showPassword); };
     const handleMouseDownPassword = (event) => { event.preventDefault(); };

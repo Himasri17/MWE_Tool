@@ -671,7 +671,7 @@ def register():
         
     hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
     
-    # Auto-approve admin users, require approval for other roles
+    # Auto-approve admin users, require approval for other roles (including reviewers)
     is_approved = (role.lower() == "admin")
     
     # Use IST timezone
@@ -730,11 +730,11 @@ def register():
         log_action_and_update_report("system", f'New ADMIN user registered and auto-approved: {username}.')
         return jsonify({"message": "Admin user registered successfully. You can login immediately."})
     else:
-        # Regular user (Annotator or Reviewer) - send approval request to org admin
+        # Regular user (Annotator OR Reviewer) - send approval request to org admin
         send_org_admin_notification(user_data_for_email)
         log_action_and_update_report("system", f'New user registered: {username}. Awaiting approval.')
-        return jsonify({"message": "User registered successfully. Awaiting admin approval."})  
-
+        return jsonify({"message": "User registered successfully. Awaiting admin approval."})
+    
 @app.route("/api/org-admins", methods=["GET"])
 @admin_required
 def get_org_admins():
@@ -1185,14 +1185,14 @@ Sentence Annotation System Team
 @app.route("/admin/pending-users", methods=["GET"])
 @admin_required
 def get_pending_users():
-    """Fetches list of users who are not yet approved and not rejected (excluding admins). (UNCHANGED)"""
+    """Fetches list of users who are not yet approved and not rejected (excluding admins)."""
     try:
         # Only show non-admin users pending approval AND not rejected
         pending_users_cursor = users_collection.find(
             {
                 "is_approved": False,
-                "is_rejected": {"$ne": True},  # NEW: Exclude rejected users
-                "role": {"$ne": "admin"}  # Exclude admin users
+                "is_rejected": {"$ne": True},  # Exclude rejected users
+                "role": {"$nin": ["admin"]}  # Exclude admin users
             },
             {
                 "username": 1, 
@@ -1217,7 +1217,6 @@ def get_pending_users():
     except Exception as e:
         print(f"Error fetching pending users: {e}")
         return jsonify({"error": "Internal server error"}), 500
- 
   
 @app.route("/admin/approve-user/<user_id>", methods=["PUT"])
 @admin_required
@@ -1241,20 +1240,25 @@ def approve_user(user_id):
         IST = ZoneInfo("Asia/Kolkata")
         approval_time_ist = datetime.now(IST)
         
+        # First get the user document to verify it exists
+        user_doc = users_collection.find_one({"_id": ObjectId(user_id)})
+        if not user_doc:
+            return jsonify({"message": "User not found."}), 404
+        
+        # Update the user - set is_approved to True and clear any rejection flags
         result = users_collection.update_one(
             {"_id": ObjectId(user_id)},
             {"$set": {
                 "is_approved": True, 
-                "approved_by": admin_email,  # Store actual admin email instead of "admin"
-                "approved_at": approval_time_ist,  # Use IST timestamp
-                # Remove approval_date to avoid confusion - use only approved_at
+                "approved_by": admin_email,
+                "approved_at": approval_time_ist,
+                "is_rejected": False,  # Clear rejection status if it was previously rejected
+                "rejection_reason": None  # Clear rejection reason
             }}
         )
         
         if result.matched_count == 0:
             return jsonify({"message": "User not found."}), 404
-        
-        user_doc = users_collection.find_one({"_id": ObjectId(user_id)})
         
         # Send approval email to user
         send_user_approval_email(user_doc, approved=True)

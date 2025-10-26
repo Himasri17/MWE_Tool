@@ -1,11 +1,11 @@
 // Update AdminDashboard.js - Fix the delete and data refresh logic
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useParams, Link as RouterLink } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
     Container, Typography, Box, Paper, Button, Chip, Divider,
     List, ListItem, ListItemText, TextField, useTheme,
     IconButton, Menu, MenuItem, Tooltip,
-    Skeleton, Badge, Dialog, DialogTitle, 
+    Skeleton, Dialog, DialogTitle, 
     DialogContent, DialogActions, Alert, Snackbar,Table, TableBody, TableCell, TableContainer, TableHead, TableRow 
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
@@ -243,10 +243,7 @@ export default function AdminDashboard() {
         showSnackbar('Project updated successfully!', 'success');
     };
     
-    // NEW: Navigate to approval page
-    const handleApproveUsers = () => {
-        navigate(`/admin/${username}/approvals`);
-    };
+ 
 
      const handleMarkReviewed = async (feedbackId) => {
         try {
@@ -307,10 +304,6 @@ export default function AdminDashboard() {
         }
     };
 
-    const handleLogout = async () => { 
-        removeToken();
-        navigate('/login'); 
-    };
 
     // NEW: Close image preview
     const handleCloseImagePreview = () => {
