@@ -1,4 +1,4 @@
-// Update AdminDashboard.js - Fix the delete and data refresh logic
+// Update AdminDashboard.js - Fix the fetchData initialization issue
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -25,8 +25,6 @@ import ContactUsDialog from '../User/ContactUsDialog';
 import TermsDialog from '../User Authentication/TermsDialog';
 import { getAuthHeaders, removeToken } from '../../components/authUtils'; 
 import Navbar from '../../components/Navbar';
-
-
 
 export default function AdminDashboard() {
     const { username } = useParams();
@@ -62,44 +60,6 @@ export default function AdminDashboard() {
     // NEW STATES for Image Preview
     const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
-
-    // --- Pagination Calculations ---
-    const filteredProjects = projects.filter(project => 
-        project.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    // Calculate pagination
-    const indexOfLastProject = currentPage * projectsPerPage;
-    const indexOfFirstProject = indexOfLastProject - projectsPerPage;
-    const currentProjects = filteredProjects.slice(indexOfFirstProject, indexOfLastProject);
-    const totalPages = Math.ceil(filteredProjects.length / projectsPerPage);
-
-    // Pagination handlers
-    const handleNextPage = () => {
-        if (currentPage < totalPages) {
-            setCurrentPage(currentPage + 1);
-        }
-    };
-
-    const handlePrevPage = () => {
-        if (currentPage > 1) {
-            setCurrentPage(currentPage - 1);
-        }
-    };
-
-    const handlePageClick = (pageNumber) => {
-        setCurrentPage(pageNumber);
-    };
-
-    // Reset to page 1 when search term changes
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [searchTerm]);
-
-    const handleEditProject = (project) => {
-    setSelectedProjectForEdit(project);
-    setEditDialogOpen(true);
-    };
 
     // --- Data Fetching (Live API Integration) ---
     const fetchData = useCallback(async () => {
@@ -156,15 +116,59 @@ export default function AdminDashboard() {
         }
     }, []);
 
+    // --- Auto-refresh useEffect - MOVED AFTER fetchData definition ---
+    useEffect(() => {
+        const interval = setInterval(() => {
+            fetchData();
+        }, 30000); // Refresh every 30 seconds
+
+        return () => clearInterval(interval);
+    }, [fetchData]);
+
+    // --- Initial data load ---
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    // --- Pagination Calculations ---
+    const filteredProjects = projects.filter(project => 
+        project.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Calculate pagination
+    const indexOfLastProject = currentPage * projectsPerPage;
+    const indexOfFirstProject = indexOfLastProject - projectsPerPage;
+    const currentProjects = filteredProjects.slice(indexOfFirstProject, indexOfLastProject);
+    const totalPages = Math.ceil(filteredProjects.length / projectsPerPage);
+
+    // Pagination handlers
+    const handleNextPage = () => {
+        if (currentPage < totalPages) {
+            setCurrentPage(currentPage + 1);
+        }
+    };
+
+    const handlePrevPage = () => {
+        if (currentPage > 1) {
+            setCurrentPage(currentPage - 1);
+        }
+    };
+
+    const handlePageClick = (pageNumber) => {
+        setCurrentPage(pageNumber);
+    };
+
+    // Reset to page 1 when search term changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
 
     // --- Handlers ---
     const handleUnauthorized = () => {
         removeToken();
         navigate('/login');
     };
+
     const handleAddProject = () => { setIsModalOpen(true); };
     const handleProjectCreated = () => { 
         fetchData(); 
@@ -235,17 +239,19 @@ export default function AdminDashboard() {
         const token = localStorage.getItem('jwt_token');
         window.open(`http://127.0.0.1:5001/api/projects/${projectId}/download?format=XML&token=${token}`, '_blank'); 
     };
-    
- 
+
+    const handleEditProject = (project) => {
+        setSelectedProjectForEdit(project);
+        setEditDialogOpen(true);
+    };
+
     const handleProjectUpdated = () => {
         fetchData();
         setEditDialogOpen(false);
         showSnackbar('Project updated successfully!', 'success');
     };
-    
- 
 
-     const handleMarkReviewed = async (feedbackId) => {
+    const handleMarkReviewed = async (feedbackId) => {
         try {
             const response = await fetch(`http://127.0.0.1:5001/admin/feedbacks/${feedbackId}/review`, {
                 method: 'PUT',
@@ -294,7 +300,6 @@ export default function AdminDashboard() {
         }
     };
 
-
     // NEW: Handle image preview
     const handleImagePreview = (filename) => {
         if (filename && filename !== 'None') {
@@ -303,7 +308,6 @@ export default function AdminDashboard() {
             setImagePreviewOpen(true);
         }
     };
-
 
     // NEW: Close image preview
     const handleCloseImagePreview = () => {
@@ -358,303 +362,302 @@ export default function AdminDashboard() {
     );
 
     // NEW: Image Preview Dialog Component
-const ImagePreviewDialog = () => (
-    <Dialog 
-        open={imagePreviewOpen} 
-        onClose={handleCloseImagePreview}
-        maxWidth="md"
-        fullWidth
-    >
-        <DialogTitle sx={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center' 
-        }}>
-            <Typography variant="h6" component="span" fontWeight={600}>
-                Feedback Image
-            </Typography>
-            <IconButton onClick={handleCloseImagePreview}>
-                <CloseIcon />
-            </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center',
-            minHeight: '400px'
-        }}>
-            {selectedImage ? (
-                <img 
-                    src={selectedImage} 
-                    alt="Feedback attachment" 
-                    style={{ 
-                        maxWidth: '100%', 
-                        maxHeight: '70vh', 
-                        objectFit: 'contain' 
-                    }} 
-                />
-            ) : (
-                <Typography color="text.secondary">No image available</Typography>
-            )}
-        </DialogContent>
-        <DialogActions>
-            <Button onClick={handleCloseImagePreview}>Close</Button>
-        </DialogActions>
-    </Dialog>
-);
+    const ImagePreviewDialog = () => (
+        <Dialog 
+            open={imagePreviewOpen} 
+            onClose={handleCloseImagePreview}
+            maxWidth="md"
+            fullWidth
+        >
+            <DialogTitle sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center' 
+            }}>
+                <Typography variant="h6" component="span" fontWeight={600}>
+                    Feedback Image
+                </Typography>
+                <IconButton onClick={handleCloseImagePreview}>
+                    <CloseIcon />
+                </IconButton>
+            </DialogTitle>
+            <DialogContent sx={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center',
+                minHeight: '400px'
+            }}>
+                {selectedImage ? (
+                    <img 
+                        src={selectedImage} 
+                        alt="Feedback attachment" 
+                        style={{ 
+                            maxWidth: '100%', 
+                            maxHeight: '70vh', 
+                            objectFit: 'contain' 
+                        }} 
+                    />
+                ) : (
+                    <Typography color="text.secondary">No image available</Typography>
+                )}
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={handleCloseImagePreview}>Close</Button>
+            </DialogActions>
+        </Dialog>
+    );
 
     const ProjectListItem = ({ project }) => {
-    const [anchorEl, setAnchorEl] = useState(null);
-    const open = Boolean(anchorEl);
-    const progressChip = `${project.done}/${project.total}`;
-    
-    // FIXED: Show assigned users properly
-    const assignedUsersDisplay = project.assigned_users && project.assigned_users.length > 0 
-        ? project.assigned_users.join(', ')
-        : project.assigned_user || 'No users assigned';
+        const [anchorEl, setAnchorEl] = useState(null);
+        const open = Boolean(anchorEl);
+        const progressChip = `${project.done}/${project.total}`;
+        
+        // FIXED: Show assigned users properly
+        const assignedUsersDisplay = project.assigned_users && project.assigned_users.length > 0 
+            ? project.assigned_users.join(', ')
+            : project.assigned_user || 'No users assigned';
 
-    const handleMenuClick = (event) => { 
-        setAnchorEl(event.currentTarget); 
-        event.stopPropagation(); 
-    };
-    
-    const handleMenuClose = () => { 
-        setAnchorEl(null); 
-    };
+        const handleMenuClick = (event) => { 
+            setAnchorEl(event.currentTarget); 
+            event.stopPropagation(); 
+        };
+        
+        const handleMenuClose = () => { 
+            setAnchorEl(null); 
+        };
 
-    return (
-        <ListItem
-            secondaryAction={
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Chip 
-                        label={progressChip} 
-                        color={project.done === project.total ? "success" : "primary"} 
-                        variant="outlined" 
-                        size="small" 
-                        sx={{ fontWeight: 'bold', mr: 1 }} 
-                    />
-                    <Tooltip title="Project Actions">
-                        <IconButton edge="end" aria-label="more" onClick={handleMenuClick}>
-                            <MoreVertIcon />
-                        </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete Project">
-                        <IconButton 
-                            edge="end" 
-                            aria-label="delete" 
-                            onClick={(e) => { 
-                                e.stopPropagation(); 
-                                handleDeleteProject(project.id, project.name); 
-                            }} 
-                            sx={{ color: theme.palette.error.main, ml: 1 }}
+        return (
+            <ListItem
+                secondaryAction={
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Chip 
+                            label={progressChip} 
+                            color={project.done === project.total ? "success" : "primary"} 
+                            variant="outlined" 
+                            size="small" 
+                            sx={{ fontWeight: 'bold', mr: 1 }} 
+                        />
+                        <Tooltip title="Project Actions">
+                            <IconButton edge="end" aria-label="more" onClick={handleMenuClick}>
+                                <MoreVertIcon />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete Project">
+                            <IconButton 
+                                edge="end" 
+                                aria-label="delete" 
+                                onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    handleDeleteProject(project.id, project.name); 
+                                }} 
+                                sx={{ color: theme.palette.error.main, ml: 1 }}
+                            >
+                                <DeleteIcon />
+                            </IconButton>
+                        </Tooltip>
+                        <Menu 
+                            anchorEl={anchorEl} 
+                            open={open} 
+                            onClose={handleMenuClose}
+                            onClick={(e) => e.stopPropagation()}
                         >
-                            <DeleteIcon />
-                        </IconButton>
-                    </Tooltip>
-                    <Menu 
-                        anchorEl={anchorEl} 
-                        open={open} 
-                        onClose={handleMenuClose}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <MenuItem 
-                            onClick={() => { 
-                                handleMenuClose(); 
-                                handleAssignUser(project.id, project.name); 
-                            }}
-                        >
-                            <PersonAddIcon fontSize="small" sx={{ mr: 1 }} /> 
-                            Assign User
-                        </MenuItem>
-                        <MenuItem 
-                            onClick={() => { 
-                                handleMenuClose(); 
-                                handleDownload(project.id, project.name);
-                            }}
-                        >
-                            <FileDownloadIcon fontSize="small" sx={{ mr: 1 }} /> 
-                            Download File
-                        </MenuItem>
-                        <MenuItem 
-                            onClick={() => { 
-                                handleMenuClose(); 
-                                handleEditProject(project); 
-                            }}
-                        >
-                            <EditIcon fontSize="small" sx={{ mr: 1 }} /> 
-                            Edit Project
-                        </MenuItem>
-                        <Divider />
-                        <MenuItem 
-                            onClick={() => { 
-                                handleMenuClose(); 
-                                handleProjectReview(project); 
-                            }}
-                        >
-                            View Sentences
-                        </MenuItem>
-                    </Menu>
-                </Box>
-            }
-            onClick={() => handleProjectReview(project)} 
-            sx={{ 
-                bgcolor: theme.palette.background.paper, 
-                mb: 2, 
-                borderRadius: theme.shape.borderRadius,
-                boxShadow: theme.shadows[1], 
-                cursor: 'pointer', 
-                '&:hover': { 
-                    boxShadow: theme.shadows[3],
-                    transform: 'translateY(-2px)',
+                            <MenuItem 
+                                onClick={() => { 
+                                    handleMenuClose(); 
+                                    handleAssignUser(project.id, project.name); 
+                                }}
+                            >
+                                <PersonAddIcon fontSize="small" sx={{ mr: 1 }} /> 
+                                Assign User
+                            </MenuItem>
+                            <MenuItem 
+                                onClick={() => { 
+                                    handleMenuClose(); 
+                                    handleDownload(project.id, project.name);
+                                }}
+                            >
+                                <FileDownloadIcon fontSize="small" sx={{ mr: 1 }} /> 
+                                Download File
+                            </MenuItem>
+                            <MenuItem 
+                                onClick={() => { 
+                                    handleMenuClose(); 
+                                    handleEditProject(project); 
+                                }}
+                            >
+                                <EditIcon fontSize="small" sx={{ mr: 1 }} /> 
+                                Edit Project
+                            </MenuItem>
+                            <Divider />
+                            <MenuItem 
+                                onClick={() => { 
+                                    handleMenuClose(); 
+                                    handleProjectReview(project); 
+                                }}
+                            >
+                                View Sentences
+                            </MenuItem>
+                        </Menu>
+                    </Box>
+                }
+                onClick={() => handleProjectReview(project)} 
+                sx={{ 
+                    bgcolor: theme.palette.background.paper, 
+                    mb: 2, 
+                    borderRadius: theme.shape.borderRadius,
+                    boxShadow: theme.shadows[1], 
+                    cursor: 'pointer', 
+                    '&:hover': { 
+                        boxShadow: theme.shadows[3],
+                        transform: 'translateY(-2px)',
+                        transition: 'all 0.2s ease-in-out'
+                    },
+                    borderLeft: `5px solid ${theme.palette.primary.main}`,
                     transition: 'all 0.2s ease-in-out'
-                },
-                borderLeft: `5px solid ${theme.palette.primary.main}`,
-                transition: 'all 0.2s ease-in-out'
-            }}
-        >
-            <Box sx={{ flex: 1 }}>
-                <Typography variant="h6" fontWeight="bold" color="text.primary" gutterBottom>
-                    {project.name}
-                </Typography>
-                <Box component="div" sx={{ mt: 0.5 }}>
-                    <Typography variant="body2" color="text.secondary" component="div">
-                        Language: {project.language || 'N/A'}
+                }}
+            >
+                <Box sx={{ flex: 1 }}>
+                    <Typography variant="h6" fontWeight="bold" color="text.primary" gutterBottom>
+                        {project.name}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" component="div">
-                        Description: {project.description || 'No description provided'}
-                    </Typography>
-                    {/* FIXED: Show assigned users properly */}
-                    <Typography variant="body2" color="text.secondary" component="div">
-                        Assigned to: {assignedUsersDisplay}
-                    </Typography>
+                    <Box component="div" sx={{ mt: 0.5 }}>
+                        <Typography variant="body2" color="text.secondary" component="div">
+                            Language: {project.language || 'N/A'}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" component="div">
+                            Description: {project.description || 'No description provided'}
+                        </Typography>
+                        {/* FIXED: Show assigned users properly */}
+                        <Typography variant="body2" color="text.secondary" component="div">
+                            Assigned to: {assignedUsersDisplay}
+                        </Typography>
+                    </Box>
                 </Box>
-            </Box>
-        </ListItem>
-    );
-};
+            </ListItem>
+        );
+    };
 
-// --- FEEDBACK DIALOG COMPONENT ---
-// --- FEEDBACK DIALOG COMPONENT ---
-const FeedbackDialog = () => (
-    <Dialog 
-        open={feedbackDialogOpen} 
-        onClose={handleCloseFeedbackDialog}
-        maxWidth="lg"
-        fullWidth
-        scroll="paper"
-    >
-        <DialogTitle sx={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            bgcolor: theme.palette.primary.light,
-            color: 'text.primary'
-        }}>
-            <Typography variant="h6" component="span" fontWeight={600}>
-                User Feedbacks ({feedbacks.length})
-            </Typography>
-            <IconButton onClick={handleCloseFeedbackDialog} size="small">
-                <CloseIcon />
-            </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ p: 0 }}>
-            <TableContainer component={Paper} elevation={0}>
-                <Table size="small">
-                    <TableHead>
-                        <TableRow sx={{ bgcolor: theme.palette.grey[200] }}>
-                            <TableCell sx={{ fontWeight: 'bold' }}>Time</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold' }}>Email</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold' }}>Feedback</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>File</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold', width: '10%', textAlign: 'center' }}>Status</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold', width: '10%', textAlign: 'center' }}>Actions</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {isLoading ? (
-                            Array.from(new Array(5)).map((_, index) => (
-                                <TableRow key={index}><TableCell colSpan={6}><Skeleton height={40} /></TableCell></TableRow>
-                            ))
-                        ) : feedbacks.length === 0 ? (
-                            <TableRow><TableCell colSpan={6} align="center">No user feedback submitted yet.</TableCell></TableRow>
-                        ) : (
-                            feedbacks.map((fb) => (
-                                <TableRow key={fb.id} hover sx={{ bgcolor: fb.is_reviewed ? theme.palette.success.light + '10' : 'inherit' }}>
-                                    <TableCell>{fb.time.split(' ')[0]}</TableCell>
-                                    <TableCell>{fb.email}</TableCell>
-                                    <TableCell sx={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        <Tooltip title={fb.feedback} placement="bottom-start">
-                                            <span>{fb.feedback}</span>
-                                        </Tooltip>
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        {fb.file && fb.file !== 'None' ? (
-                                            <Tooltip title={`Click to view: ${fb.file}`} placement="top">
-                                                <IconButton 
-                                                    size="small"
-                                                    onClick={() => handleImagePreview(fb.file)}
-                                                    color="primary"
-                                                >
-                                                    <CloudDownloadIcon fontSize="small" />
-                                                </IconButton>
+    // --- FEEDBACK DIALOG COMPONENT ---
+    const FeedbackDialog = () => (
+        <Dialog 
+            open={feedbackDialogOpen} 
+            onClose={handleCloseFeedbackDialog}
+            maxWidth="lg"
+            fullWidth
+            scroll="paper"
+        >
+            <DialogTitle sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                bgcolor: theme.palette.primary.light,
+                color: 'text.primary'
+            }}>
+                <Typography variant="h6" component="span" fontWeight={600}>
+                    User Feedbacks ({feedbacks.length})
+                </Typography>
+                <IconButton onClick={handleCloseFeedbackDialog} size="small">
+                    <CloseIcon />
+                </IconButton>
+            </DialogTitle>
+            <DialogContent sx={{ p: 0 }}>
+                <TableContainer component={Paper} elevation={0}>
+                    <Table size="small">
+                        <TableHead>
+                            <TableRow sx={{ bgcolor: theme.palette.grey[200] }}>
+                                <TableCell sx={{ fontWeight: 'bold' }}>Time</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>Email</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>Feedback</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', width: '10%' }}>File</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', width: '10%', textAlign: 'center' }}>Status</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', width: '10%', textAlign: 'center' }}>Actions</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {isLoading ? (
+                                Array.from(new Array(5)).map((_, index) => (
+                                    <TableRow key={index}><TableCell colSpan={6}><Skeleton height={40} /></TableCell></TableRow>
+                                ))
+                            ) : feedbacks.length === 0 ? (
+                                <TableRow><TableCell colSpan={6} align="center">No user feedback submitted yet.</TableCell></TableRow>
+                            ) : (
+                                feedbacks.map((fb) => (
+                                    <TableRow key={fb.id} hover sx={{ bgcolor: fb.is_reviewed ? theme.palette.success.light + '10' : 'inherit' }}>
+                                        <TableCell>{fb.time.split(' ')[0]}</TableCell>
+                                        <TableCell>{fb.email}</TableCell>
+                                        <TableCell sx={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            <Tooltip title={fb.feedback} placement="bottom-start">
+                                                <span>{fb.feedback}</span>
                                             </Tooltip>
-                                        ) : (
-                                            <Typography variant="body2" color="text.disabled">N/A</Typography>
-                                        )}
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <Chip 
-                                            label={fb.is_reviewed ? "Reviewed" : "Pending"} 
-                                            color={fb.is_reviewed ? "success" : "warning"} 
-                                            size="small"
-                                        />
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        {!fb.is_reviewed && (
-                                            <Tooltip title="Mark as Reviewed">
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            {fb.file && fb.file !== 'None' ? (
+                                                <Tooltip title={`Click to view: ${fb.file}`} placement="top">
+                                                    <IconButton 
+                                                        size="small"
+                                                        onClick={() => handleImagePreview(fb.file)}
+                                                        color="primary"
+                                                    >
+                                                        <CloudDownloadIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            ) : (
+                                                <Typography variant="body2" color="text.disabled">N/A</Typography>
+                                            )}
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Chip 
+                                                label={fb.is_reviewed ? "Reviewed" : "Pending"} 
+                                                color={fb.is_reviewed ? "success" : "warning"} 
+                                                size="small"
+                                            />
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            {!fb.is_reviewed && (
+                                                <Tooltip title="Mark as Reviewed">
+                                                    <IconButton 
+                                                        size="small" 
+                                                        color="success" 
+                                                        onClick={() => handleMarkReviewed(fb.id)}
+                                                    >
+                                                        <MarkEmailReadIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            )}
+                                            <Tooltip title="Delete Feedback">
                                                 <IconButton 
                                                     size="small" 
-                                                    color="success" 
-                                                    onClick={() => handleMarkReviewed(fb.id)}
+                                                    color="error" 
+                                                    onClick={() => handleDeleteFeedback(fb.id)}
                                                 >
-                                                    <MarkEmailReadIcon fontSize="small" />
+                                                    <DeleteIcon fontSize="small" />
                                                 </IconButton>
                                             </Tooltip>
-                                        )}
-                                        <Tooltip title="Delete Feedback">
-                                            <IconButton 
-                                                size="small" 
-                                                color="error" 
-                                                onClick={() => handleDeleteFeedback(fb.id)}
-                                            >
-                                                <DeleteIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                        )}
-                    </TableBody>
-                </Table>
-            </TableContainer>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-            <Button onClick={handleCloseFeedbackDialog} variant="contained">
-                Close
-            </Button>
-        </DialogActions>
-    </Dialog>
-);
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            </DialogContent>
+            <DialogActions sx={{ p: 2 }}>
+                <Button onClick={handleCloseFeedbackDialog} variant="contained">
+                    Close
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
 
     // --- FIXED: Header Bar with Full Width ---
-const renderHeaderBar = () => (
-    <Navbar 
-        username={username}
-        pendingUsersCount={pendingUsersCount}
-        feedbacks={feedbacks}
-        onOpenFeedbackDialog={handleOpenFeedbackDialog}
-    />
-);
+    const renderHeaderBar = () => (
+        <Navbar 
+            username={username}
+            pendingUsersCount={pendingUsersCount}
+            feedbacks={feedbacks}
+            onOpenFeedbackDialog={handleOpenFeedbackDialog}
+        />
+    );
 
     // --- Main Render ---
     return (

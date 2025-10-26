@@ -302,7 +302,7 @@ Sentence Annotation System Team
         print(f"Failed to send admin welcome email: {e}")
         
 def update_session_history_report(username_to_update):
-    """Recalculates and saves the session history for a specific user. (UNCHANGED)"""
+    """Recalculates and saves the session history for a specific user with enhanced tracking"""
     logs_list = []
     UTC = ZoneInfo("UTC")
     IST = ZoneInfo("Asia/Kolkata")
@@ -313,38 +313,57 @@ def update_session_history_report(username_to_update):
 
     activities = sorted(user_activity_doc.get('activities', []), key=lambda x: x['timestamp'])
     session = None
+    
     for act in activities:
         desc = act['description']
         utc_ts = act['timestamp']
+        
         if desc == "Login":
             if session:
+                # Close previous session if it exists
                 prev_logout_ist = act['timestamp'].replace(tzinfo=UTC).astimezone(IST)
                 session["logoutTimeIST"] = prev_logout_ist.strftime('%d/%m/%Y, %H:%M:%S')
-                session["tasksDone"].append("--- (Session ended unexpectedly) ---")
+                if not session["tasksDone"]:
+                    session["tasksDone"].append("Session ended with no tasks")
                 logs_list.append(session)
+            
             login_ist = utc_ts.replace(tzinfo=UTC).astimezone(IST)
             session = {
-                "id": f"{username_to_update}_{utc_ts.timestamp()}", "username": username_to_update,
+                "id": f"{username_to_update}_{utc_ts.timestamp()}",
+                "username": username_to_update,
                 "loginTimeIST": login_ist.strftime('%d/%m/%Y, %H:%M:%S'),
-                "logoutTimeIST": None, "tasksDone": []
+                "logoutTimeIST": None, 
+                "tasksDone": []
             }
+            
         elif desc == "Logout" and session:
             logout_ist = utc_ts.replace(tzinfo=UTC).astimezone(IST)
             session["logoutTimeIST"] = logout_ist.strftime('%d/%m/%Y, %H:%M:%S')
             logs_list.append(session)
             session = None
-        elif session:
-            session["tasksDone"].append(desc)
-    if session: logs_list.append(session)
+            
+        elif session and desc not in ["Login", "Logout"]:
+            # Add task to current session, avoiding duplicates
+            if desc not in session["tasksDone"]:
+                session["tasksDone"].append(desc)
+    
+    # Handle the last session if it wasn't closed
+    if session:
+        if not session["tasksDone"]:
+            session["tasksDone"].append("Active session - no tasks recorded")
+        logs_list.append(session)
 
-    sorted_sessions = sorted(logs_list, key=lambda s: s.get('id', ''), reverse=True)
+    # Sort sessions by login time (newest first)
+    sorted_sessions = sorted(logs_list, key=lambda s: s.get('loginTimeIST', ''), reverse=True)
+    
+    # Update the session history
     user_session_history_collection.update_one(
         {'username': username_to_update},
         {'$set': {'sessions': sorted_sessions}},
         upsert=True
     )
-    print(f"User session history for '{username_to_update}' has been updated.")
-
+    print(f"User session history for '{username_to_update}' has been updated with {len(sorted_sessions)} sessions.")
+    
 def log_action_and_update_report(username, description):
     """Logs a new raw event and triggers a rebuild of that user's session history report. (UNCHANGED)"""
     user_activities_collection.update_one(
@@ -596,10 +615,22 @@ def extract_text_from_file(file, file_extension):
     return sentences_data
 
 
+def log_reviewer_action(reviewer_username, action_description, annotator_username=None):
+    """Enhanced logging for reviewer actions"""
+    # Log for reviewer
+    log_action_and_update_report(reviewer_username, action_description)
+    
+    # Also log for annotator if provided
+    if annotator_username and annotator_username != reviewer_username:
+        user_action = action_description.replace("reviewed", "had work reviewed")
+        log_action_and_update_report(annotator_username, user_action)
+
+# Update the update_sentence_review_status function to include logging
 def update_sentence_review_status(sentence_id):
-    """Update sentence review status based on its tags"""
+    """Update sentence review status based on its tags with enhanced logging"""
     try:
         from bson.objectid import ObjectId
+        
         # Count remaining staged tags for this sentence
         remaining_staged_tags = staged_tags_collection.count_documents({
             "source_sentence_id": sentence_id
@@ -616,26 +647,23 @@ def update_sentence_review_status(sentence_id):
             return
             
         current_status = sentence.get('review_status', 'Pending')
+        annotator_username = sentence.get('username')
         
-        # Determine is_annotated based on the existence of any tags or prior manual setting
+        # Determine is_annotated based on the existence of any tags
         is_annotated = (remaining_staged_tags > 0) or (approved_tags_count > 0) or sentence.get('is_annotated', False)
         
-        # NEW LOGIC: Determine the correct status
+        # Determine the correct status
         if remaining_staged_tags > 0:
-            # Still has pending tags - remains in review
             new_status = "Pending"
         elif approved_tags_count > 0:
-            # All tags processed and at least one approved
             new_status = "Approved"
         elif current_status == "Approved" and approved_tags_count == 0 and remaining_staged_tags == 0:
-            # Manually approved sentence without tags - keep approved
             new_status = "Approved"
         else:
-            # All tags rejected or no tags, so default to Rejected or keep Pending if not reviewed
             if is_annotated and approved_tags_count == 0:
-                 new_status = "Rejected" # All annotations were rejected
+                 new_status = "Rejected"
             else:
-                 new_status = "Pending" # Default for unannotated/unreviewed
+                 new_status = "Pending"
 
         # Update the sentence
         sentences_collection.update_one(
@@ -646,11 +674,15 @@ def update_sentence_review_status(sentence_id):
             }}
         )
         
+        # Log status change
+        if current_status != new_status and annotator_username:
+            status_change_msg = f"Sentence status changed from '{current_status}' to '{new_status}'"
+            log_action_and_update_report(annotator_username, status_change_msg)
+        
         print(f"Updated sentence {sentence_id} status: {new_status} (approved: {approved_tags_count}, pending: {remaining_staged_tags})")
         
     except Exception as e:
-        print(f"Error updating sentence status: {e}")
-                   
+        print(f"Error updating sentence status: {e}")                
 # --- API Routes ---
 
 @app.route("/register", methods=["POST"])
@@ -1342,14 +1374,38 @@ def check_role():
 
 
 @app.route("/logout", methods=["POST"])
-@token_required
 def logout():
-    """Handles user logout"""
-    data = request.json
-    username = data.get("username")
-    log_action_and_update_report(username, 'Logout')
-    return jsonify({"message": "Logout successful"})
-
+    """Handles user logout - modified to work even with expired tokens"""
+    try:
+        data = request.json
+        username = data.get("username")
+        
+        # Try to verify token, but don't fail if it's expired
+        token = None
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+        
+        if token:
+            # Try to verify, but continue even if token is invalid
+            try:
+                payload = verify_jwt_token(token)
+                if payload:
+                    request.current_user = payload
+            except Exception as e:
+                print(f"Token verification failed during logout: {e}")
+                # Continue with logout even if token is invalid
+        
+        # Always log the logout action
+        if username:
+            log_action_and_update_report(username, 'Logout')
+            
+        return jsonify({"message": "Logout successful"})
+        
+    except Exception as e:
+        print(f"Error during logout: {e}")
+        # Still return success to allow client-side cleanup
+        return jsonify({"message": "Logout completed"})
 
 @app.route('/api/users-list', methods=['GET'])
 def get_users_list():
@@ -4250,7 +4306,10 @@ def get_project_sentences(project_id):
                     "review_comments": tag.get("review_comments", "")
                 }
 
-                if tag_data["username"] == "auto_annotator_system": 
+                # Determine review status
+                if tag.get("review_status") == "Rejected":
+                    tag_data["review_status"] = "Rejected"
+                elif tag_data["username"] == "auto_annotator_system": 
                     tag_data["review_status"] = "Approved" 
                 else:
                     tag_data["review_status"] = "Pending"
@@ -4430,10 +4489,16 @@ def get_staged_tags_for_review(sentence_id):
 @app.route('/reviewer/tag/<tag_id>/approve', methods=['PUT'])
 def approve_tag(tag_id):
     try:
+        data = request.json
+        reviewer_username = data.get('reviewerUsername')
+        
         staged_tag = staged_tags_collection.find_one({"_id": ObjectId(tag_id)})
         if not staged_tag:
             return jsonify({"message": "Staged tag not found or already reviewed."}), 404
+            
         sentence_id = staged_tag.get('source_sentence_id')
+        annotator_username = staged_tag.get('username')
+        
         # Create final tag with updated status
         final_tag = {
             'tag': staged_tag.get('tag'),
@@ -4442,8 +4507,8 @@ def approve_tag(tag_id):
             'text': staged_tag.get('text'),
             'annotation_date': staged_tag.get('annotation_date'),
             'review_status': 'Approved',  
-            'review_comments': request.json.get('comments', ''),
-            'reviewed_by': request.json.get('reviewerUsername'),
+            'review_comments': data.get('comments', ''),
+            'reviewed_by': reviewer_username,
             'reviewed_at': datetime.utcnow()
         }
         
@@ -4453,49 +4518,156 @@ def approve_tag(tag_id):
         
         # Remove from staged collection
         staged_tags_collection.delete_one({"_id": ObjectId(tag_id)})
-        remaining_staged_tags = staged_tags_collection.count_documents(
-            {"source_sentence_id": sentence_id}
-        )
         
+        # Update sentence review status
+        update_sentence_review_status(sentence_id)
         
-        if remaining_staged_tags == 0:
-            sentences_collection.update_one(
-                {"_id": ObjectId(sentence_id)},
-                {"$set": {"review_status": "Approved", "is_annotated": True}}
-            )
-        # Update sentence status
-        update_sentence_review_status(final_tag.get('source_sentence_id'))
-        
-        log_action_and_update_report(request.json.get('reviewerUsername', 'system'), 
-                                     f"Approved tag '{final_tag.get('text')}' by {final_tag.get('username')}.")
+        # Log the action for BOTH reviewer and annotator
+        log_action_and_update_report(reviewer_username, 
+                                   f"Approved tag '{final_tag.get('text')}' by {annotator_username}.")
+        log_action_and_update_report(annotator_username, 
+                                   f"Tag '{final_tag.get('text')}' was approved by reviewer {reviewer_username}.")
 
         return jsonify({"message": "Tag approved and finalized successfully."}), 200
     except Exception as e:
         print(f"Error approving tag: {e}")
         return jsonify({"error": "Internal server error during tag approval."}), 500
-    
+
+@app.route('/reviewer/tag/<tag_id>/undo-approval', methods=['POST'])
+def undo_tag_approval(tag_id):
+    """Move an approved tag back to staging for re-review"""
+    try:
+        data = request.json
+        reviewer_username = data.get('reviewerUsername')
+        
+        # Find the approved tag
+        approved_tag = tags_collection.find_one({"_id": ObjectId(tag_id)})
+        if not approved_tag:
+            return jsonify({"message": "Approved tag not found."}), 404
+            
+        sentence_id = approved_tag.get('source_sentence_id')
+        annotator_username = approved_tag.get('username')
+        
+        # Create staged tag from the approved tag data
+        staged_tag = {
+            'tag': approved_tag.get('tag'),
+            'source_sentence_id': approved_tag.get('source_sentence_id'),
+            'username': approved_tag.get('username'),
+            'text': approved_tag.get('text'),
+            'annotation_date': approved_tag.get('annotation_date'),
+            'status': 'Staged/Pending Review',
+            'previous_review': {
+                'was_approved': True,
+                'reviewed_by': approved_tag.get('reviewed_by'),
+                'reviewed_at': approved_tag.get('reviewed_at'),
+                'review_comments': approved_tag.get('review_comments', ''),
+                'undone_by': reviewer_username,
+                'undone_at': datetime.utcnow()
+            }
+        }
+        
+        # Insert back to staged collection
+        staged_tags_collection.insert_one(staged_tag)
+        
+        # Remove from final collections
+        tags_collection.delete_one({"_id": ObjectId(tag_id)})
+        search_tags_collection.delete_one({"_id": ObjectId(tag_id)})
+        
+        # Update sentence review status
+        update_sentence_review_status(sentence_id)
+        
+        # Log the action for BOTH reviewer and annotator
+        log_action_and_update_report(reviewer_username, 
+                                   f"Undid approval of tag '{approved_tag.get('text')}' by {annotator_username}.")
+        log_action_and_update_report(annotator_username, 
+                                   f"Tag '{approved_tag.get('text')}' approval was undone by reviewer {reviewer_username}.")
+
+        return jsonify({"message": "Tag approval undone successfully. Tag moved back to staging."}), 200
+        
+    except Exception as e:
+        print(f"Error undoing tag approval: {e}")
+        return jsonify({"error": "Internal server error during undo operation."}), 500
+
+@app.route('/reviewer/tag/<tag_id>/undo-rejection', methods=['POST'])
+def undo_tag_rejection(tag_id):
+    """Move a rejected tag back to pending status"""
+    try:
+        data = request.json
+        reviewer_username = data.get('reviewerUsername')
+        
+        # Find the rejected tag
+        rejected_tag = staged_tags_collection.find_one({"_id": ObjectId(tag_id)})
+        if not rejected_tag:
+            return jsonify({"message": "Rejected tag not found."}), 404
+            
+        sentence_id = rejected_tag.get('source_sentence_id')
+        annotator_username = rejected_tag.get('username')
+        
+        # Move back to pending status
+        staged_tags_collection.update_one(
+            {"_id": ObjectId(tag_id)},
+            {"$set": {
+                "review_status": "Pending",
+                "review_comments": "",
+                "reviewed_by": "",
+                "reviewed_at": None
+            }}
+        )
+        
+        # Update sentence review status
+        update_sentence_review_status(sentence_id)
+        
+        # Log the action for BOTH reviewer and annotator
+        log_action_and_update_report(reviewer_username, 
+                                   f"Undid rejection of tag '{rejected_tag.get('text')}' by {annotator_username}.")
+        log_action_and_update_report(annotator_username, 
+                                   f"Tag '{rejected_tag.get('text')}' rejection was undone by reviewer {reviewer_username}.")
+
+        return jsonify({"message": "Tag rejection undone successfully. Tag moved back to pending."}), 200
+        
+    except Exception as e:
+        print(f"Error undoing tag rejection: {e}")
+        return jsonify({"error": "Internal server error during undo operation."}), 500
+
 @app.route('/reviewer/tag/<tag_id>/reject', methods=['DELETE'])
 def reject_tag(tag_id):
     try:
+        data = request.json
+        reviewer_username = data.get('reviewerUsername')
+        comments = data.get('comments', '')
+        
         staged_tag = staged_tags_collection.find_one({"_id": ObjectId(tag_id)})
         if not staged_tag:
             return jsonify({"message": "Staged tag not found."}), 404
             
         sentence_id = staged_tag.get('source_sentence_id')
+        annotator_username = staged_tag.get('username')
         
-        staged_tags_collection.delete_one({"_id": ObjectId(tag_id)})
+        # Instead of deleting, mark as rejected
+        staged_tags_collection.update_one(
+            {"_id": ObjectId(tag_id)},
+            {"$set": {
+                "review_status": "Rejected",
+                "review_comments": comments,
+                "reviewed_by": reviewer_username,
+                "reviewed_at": datetime.utcnow()
+            }}
+        )
         
-        # NEW: Update sentence status
+        # Update sentence status
         update_sentence_review_status(sentence_id)
         
-        log_action_and_update_report(request.json.get('reviewerUsername', 'system'), 
-                                     f"Rejected and deleted tag '{staged_tag.get('text')}' by {staged_tag.get('username')}.")
+        # Log the action for BOTH reviewer and annotator
+        log_action_and_update_report(reviewer_username, 
+                                   f"Rejected tag '{staged_tag.get('text')}' by {annotator_username}.")
+        log_action_and_update_report(annotator_username, 
+                                   f"Tag '{staged_tag.get('text')}' was rejected by reviewer {reviewer_username}.")
 
-        return jsonify({"message": "Tag rejected and removed successfully."}), 200
+        return jsonify({"message": "Tag rejected successfully."}), 200
     except Exception as e:
         print(f"Error rejecting tag: {e}")
-        return jsonify({"error": "Internal server error during tag rejection."}), 500
-    
+        return jsonify({"error": "Internal server error during tag rejection."}), 500  
+ 
 
     
 @app.route('/tags/<username>', methods=['GET'])

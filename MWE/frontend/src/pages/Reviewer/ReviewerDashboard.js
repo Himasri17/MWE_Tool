@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect ,useCallback} from 'react';
 
 import { useNavigate,  } from 'react-router-dom';
 
@@ -12,6 +12,8 @@ import {
 
 import RateReviewIcon from '@mui/icons-material/RateReview';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import {  getAuthHeaders, removeToken } from '../../components/authUtils'; 
+
 
 
 
@@ -39,12 +41,13 @@ export default function ReviewerDashboard() {
         fetchProjects();
     }, []);
 
-    const fetchProjects = async () => {
+    const fetchProjects = useCallback(async () => {
         setLoading(true);
         setError('');
         try {
-            // Fetch projects that have any annotated work
-            const response = await fetch(`http://127.0.0.1:5001/api/projects`);
+            const response = await fetch(`http://127.0.0.1:5001/api/projects`, {
+                headers: getAuthHeaders() // Add auth headers
+            });
             const data = await response.json();
 
             if (!response.ok) throw new Error(data.error || 'Failed to fetch projects');
@@ -54,7 +57,10 @@ export default function ReviewerDashboard() {
             
             const projectsWithUsers = await Promise.all(
                 reviewableProjects.map(async (project) => {
-                    const userResponse = await fetch(`http://127.0.0.1:5001/api/projects/${project.id}/users_and_progress`);
+                    const userResponse = await fetch(
+                        `http://127.0.0.1:5001/api/projects/${project.id}/users_and_progress`,
+                        { headers: getAuthHeaders() }
+                    );
                     const userData = await userResponse.json();
                     
                     // Filter to only show users who have completed *some* annotation (progress > 0)
@@ -69,20 +75,60 @@ export default function ReviewerDashboard() {
 
         } catch (err) {
             console.error("Reviewer Dashboard Error:", err);
+            if (err.message.includes('401') || err.message.includes('403')) {
+                handleUnauthorized();
+                return;
+            }
             setError('Failed to load reviewable projects. Check API connectivity.');
         } finally {
             setLoading(false);
         }
+    }, []);
+
+    const handleUnauthorized = () => {
+        removeToken();
+        localStorage.removeItem('username');
+        navigate('/login');
     };
+
+    useEffect(() => {
+        // Initial load
+        fetchProjects();
+
+        const interval = setInterval(() => {
+            fetchProjects();
+        }, 30000); // Refresh every 30 seconds
+
+        return () => clearInterval(interval);
+    }, [fetchProjects]); 
+
     
     const handleReviewClick = (projectId, targetUsername) => {
         // Navigate to the detailed review panel
         navigate(`/reviewer/${reviewerUsername}/project/${projectId}/user/${targetUsername}`);
     };
     
-    const handleLogout = () => {
-        localStorage.removeItem('reviewerUsername');
-        navigate('/login');
+    const handleLogout = async () => {
+        try {
+            // Try to call logout API
+            await fetch('http://127.0.0.1:5001/logout', {
+                method: "POST",
+                headers: { 
+                    "Content-Type": "application/json",
+                    ...getAuthHeaders()
+                },
+                body: JSON.stringify({ username: reviewerUsername }),
+            }).catch(error => {
+                console.warn("Logout API call failed:", error);
+            });
+        } catch (error) {
+            console.warn("Logout error:", error);
+        } finally {
+            // Always cleanup and redirect
+            localStorage.removeItem('username');
+            removeToken(); // If using the same auth system
+            navigate("/");
+        }
     };
 
 

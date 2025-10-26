@@ -50,14 +50,15 @@
   background: rgba(255, 255, 255, 0.3);
 }
 
-/* Hero Section */
 .hero-section {
   position: relative;
   height: 500px;
   width: 100%;
   background-image: url('/public/institution.png');
-  background-size: cover;
+  background-size: contain;
   background-position: center;
+  background-repeat: no-repeat;
+  background-color: #f0f0f0; 
 }
 
 .gradient-overlay {

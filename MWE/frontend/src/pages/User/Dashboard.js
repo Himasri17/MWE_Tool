@@ -74,27 +74,46 @@ export default function Dashboard() {
 
     const fetchWithAuth = async (url, options = {}) => {
         const token = getToken();
-        if (!token) {
+        
+        // For logout endpoint, always try to send the request even with expired token
+        const isLogoutEndpoint = url.includes('/logout');
+        
+        if (!token && !isLogoutEndpoint) {
             navigate("/");
             return null;
         }
 
-        const response = await fetch(url, {
-            ...options,
-            headers: {
-                ...options.headers,
-                'Authorization': `Bearer ${token}`
+        const headers = {
+            ...options.headers,
+        };
+        
+        // Only add Authorization header if we have a token
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        try {
+            const response = await fetch(url, {
+                ...options,
+                headers,
+            });
+
+            // For logout, we don't care about 401 responses
+            if (response.status === 401 && !isLogoutEndpoint) {
+                removeToken();
+                navigate("/");
+                return null;
             }
-        });
 
-        if (response.status === 401) {
-            // Token expired or invalid
-            removeToken();
-            navigate("/");
+            return response;
+        } catch (error) {
+            // For logout endpoint, don't navigate away on network errors
+            if (!isLogoutEndpoint) {
+                removeToken();
+                navigate("/");
+            }
             return null;
         }
-
-        return response;
     };
 
     const fetchTags = useCallback(async () => {
@@ -262,9 +281,15 @@ export default function Dashboard() {
         isInitialLoad.current = false;
     }, [isLoading, visibleSentences, searchTerm]);
     
-    // Update the auto-tag detection to work with currentSentenceTags
     useEffect(() => {
+        console.log("DEBUG: Auto-tag detection running", {
+            selectedSentence: selectedSentence?.textContent,
+            currentSentenceTags: currentSentenceTags,
+            newSelectionActive: newSelection.isActive
+        });
+
         if (!selectedSentence || currentSentenceTags.length === 0) {
+            console.log("DEBUG: No selected sentence or no current tags");
             setAutoTags([]);
             return;
         }
@@ -272,22 +297,42 @@ export default function Dashboard() {
         const uniqueTagTexts = [...new Set(currentSentenceTags.map(t => t.text.toLowerCase()))];
         const foundTags = [];
         
+        console.log("DEBUG: Unique tag texts to check:", uniqueTagTexts);
+        
         uniqueTagTexts.forEach(tagText => {
             const regex = new RegExp(`\\b${tagText}\\b`, 'i');
             if (regex.test(selectedSentence.textContent)) {
+                console.log("DEBUG: Found matching tag in sentence:", tagText);
                 const originalTag = currentSentenceTags.find(t => t.text.toLowerCase() === tagText);
                 if (originalTag) {
-                    foundTags.push({ text: originalTag.text, tag: originalTag.tag });
+                    foundTags.push({ 
+                        phrase: originalTag.text,
+                        recommended_tag: originalTag.tag,
+                        confidence: 0.95,
+                        occurrence_count: 1,
+                        is_auto_detected: true
+                    });
                 }
             }
         });
         
-        setAutoTags(foundTags);
+        console.log("DEBUG: Found auto-detected tags:", foundTags);
+        
+        // ONLY set as recommendations, don't auto-apply
+        if (foundTags.length > 0) {
+            console.log("DEBUG: Setting auto-detected tags as recommendations only");
+            setTagRecommendations(prev => {
+                // Keep API recommendations and add auto-detected ones
+                const apiRecs = prev.filter(rec => !rec.is_auto_detected);
+                return [...foundTags, ...apiRecs];
+            });
+        }
     }, [selectedSentence, currentSentenceTags]);
 
     const fetchTagRecommendations = async (text) => {
         if (!text || text.trim().length < 2) {
-            setTagRecommendations([]);
+            // Don't clear auto-detected tags, only clear API recommendations
+            setTagRecommendations(prev => prev.filter(rec => rec.is_auto_detected));
             return;
         }
 
@@ -299,19 +344,26 @@ export default function Dashboard() {
                 body: JSON.stringify({ text: text })
             });
 
-            if (!response) return; // Authentication failed
+            if (!response) return;
 
             if (response.ok) {
                 const data = await response.json();
-                setTagRecommendations(data.recommendations || []);
+                // Merge API recommendations with existing auto-detected tags
+                const apiRecommendations = data.recommendations || [];
+                setTagRecommendations(prev => {
+                    const autoDetected = prev.filter(rec => rec.is_auto_detected);
+                    return [...autoDetected, ...apiRecommendations];
+                });
                 setShowRecommendations(true);
             } else {
                 console.error('Failed to fetch recommendations');
-                setTagRecommendations([]);
+                // Keep auto-detected tags even if API fails
+                setTagRecommendations(prev => prev.filter(rec => rec.is_auto_detected));
             }
         } catch (error) {
             console.error('Error fetching recommendations:', error);
-            setTagRecommendations([]);
+            // Keep auto-detected tags even if API fails
+            setTagRecommendations(prev => prev.filter(rec => rec.is_auto_detected));
         } finally {
             setIsLoadingRecommendations(false);
         }
@@ -386,13 +438,46 @@ export default function Dashboard() {
             
             setNewSelection({ isActive: true, text: highlightedText, tag: suggestion });
             
-            // Fetch recommendations for the highlighted text
+            // Immediately check for auto-detected tags from current sentence
+            const autoDetectedTags = findAutoDetectedTags(sentence, highlightedText);
+            if (autoDetectedTags.length > 0) {
+                setTagRecommendations(autoDetectedTags);
+                setShowRecommendations(true);
+            }
+            
+            // Then fetch API recommendations
             fetchTagRecommendations(highlightedText);
         } else {
             setNewSelection({ isActive: false, text: '', tag: '' });
             setTagRecommendations([]);
             setShowRecommendations(false);
         }
+    };
+
+    // Add this helper function
+    const findAutoDetectedTags = (sentence, highlightedText) => {
+        if (!sentence || !currentSentenceTags.length) return [];
+        
+        const uniqueTagTexts = [...new Set(currentSentenceTags.map(t => t.text.toLowerCase()))];
+        const foundTags = [];
+        
+        uniqueTagTexts.forEach(tagText => {
+            const regex = new RegExp(`\\b${tagText}\\b`, 'i');
+            if (regex.test(sentence.textContent)) {
+                const originalTag = currentSentenceTags.find(t => t.text.toLowerCase() === tagText);
+                if (originalTag) {
+                    foundTags.push({ 
+                        phrase: originalTag.text,
+                        recommended_tag: originalTag.tag,
+                        confidence: 0.95,
+                        occurrence_count: 1,
+                        is_auto_detected: true
+                    });
+                }
+            }
+        });
+        
+        return foundTags;
     };
 
     const handleSelectRecommendation = (recommendation) => {
@@ -517,20 +602,23 @@ export default function Dashboard() {
 
     const handleLogout = async () => {
         try {
+            // Try to call logout API, but don't fail if it doesn't work
             await fetchWithAuth('http://127.0.0.1:5001/logout', {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ username }),
+            }).catch(error => {
+                console.warn("Logout API call failed, continuing with client-side logout:", error);
             });
         } catch (error) {
-            console.error("Logout API error:", error);
+            console.warn("Logout API error, continuing with client-side logout:", error);
         } finally {
             // Always remove token and navigate to login
             removeToken();
             isInitialLoad.current = true;
             navigate("/");
         }
-    };;
+    };
 
     const handleFeedbackClose = (success = false) => {
         setIsFeedbackOpen(false);
@@ -814,7 +902,6 @@ export default function Dashboard() {
                                         sx={{ my: 2 }} 
                                     />
                                     
-                                    {/* TAG RECOMMENDATIONS SECTION */}
                                     {showRecommendations && tagRecommendations.length > 0 && (
                                         <Box sx={{ mb: 2, p: 1, border: '1px solid #e0e0e0', borderRadius: 1, backgroundColor: '#f5f5f5' }}>
                                             <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
@@ -826,15 +913,25 @@ export default function Dashboard() {
                                                         key={index}
                                                         label={`${rec.recommended_tag} (${Math.round(rec.confidence * 100)}%)`}
                                                         onClick={() => handleSelectRecommendation(rec)}
-                                                        color="primary"
+                                                        color={rec.is_auto_detected ? "secondary" : "primary"}
                                                         variant={newSelection.tag === rec.recommended_tag ? "filled" : "outlined"}
                                                         sx={{ cursor: 'pointer' }}
-                                                        title={`Phrase: "${rec.phrase}" - Used ${rec.occurrence_count} times`}
+                                                        title={
+                                                            rec.is_auto_detected 
+                                                                ? `Auto-detected: "${rec.phrase}"` 
+                                                                : `Phrase: "${rec.phrase}" - Used ${rec.occurrence_count} times`
+                                                        }
                                                     />
                                                 ))}
                                             </Box>
+                                            {tagRecommendations.some(rec => rec.is_auto_detected) && (
+                                                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                                                    * Purple chips are auto-detected from existing annotations
+                                                </Typography>
+                                            )}
                                         </Box>
                                     )}
+
                                     
                                     {isLoadingRecommendations && (
                                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -885,11 +982,7 @@ export default function Dashboard() {
                                                 title={`Annotated by: ${tag.username}`}
                                             />
                                         ))}
-                                        {autoTags.map((autoTag, index) => {
-                                            const isAlreadyManual = currentSentenceTags.some(manualTag => manualTag.text === autoTag.text);
-                                            if (isAlreadyManual) return null;
-                                            return <Chip key={`auto-${index}`} label={`${autoTag.text} (${autoTag.tag})`} variant="outlined" title="Automatically detected tag" />;
-                                        })}
+                                        
                                         {currentSentenceTags.length === 0 && autoTags.length === 0 && (
                                             <Typography color="text.secondary">No tags yet. Highlight text to add one.</Typography>
                                         )}

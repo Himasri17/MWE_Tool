@@ -8,7 +8,7 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import InfoIcon from '@mui/icons-material/Info';
+import UndoIcon from '@mui/icons-material/Undo';    
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 
@@ -129,6 +129,78 @@ export default function SentenceReviewPanel() {
             return s;
         }));
     }, [selectedSentenceData]);
+
+    const handleUndoApproval = async (tagId, tagText) => {
+        if (!selectedSentenceData) return;
+        
+        const url = `http://127.0.0.1:5001/reviewer/tag/${tagId}/undo-approval`;
+        
+        setIsReviewSubmitting(true);
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    reviewerUsername: username 
+                }), 
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to undo tag approval.');
+            }
+
+            showSnackbar(`Tag '${tagText}' approval undone successfully.`, 'success');
+            
+            // Refresh the data
+            setSelectedSentenceData(null);
+            await fetchSentencesForReview(false);
+            
+        } catch (error) {
+            console.error('Undo approval error:', error);
+            showSnackbar(`Undo failed: ${error.message}.`, 'error');
+        } finally {
+            setIsReviewSubmitting(false);
+        }
+    };
+
+    const handleUndoRejection = async (tagId, tagText) => {
+        if (!selectedSentenceData) return;
+        
+        const url = `http://127.0.0.1:5001/reviewer/tag/${tagId}/undo-rejection`;
+        
+        setIsReviewSubmitting(true);
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    reviewerUsername: username 
+                }), 
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to undo tag rejection.');
+            }
+
+            showSnackbar(`Tag '${tagText}' rejection undone successfully.`, 'success');
+            
+            // Refresh the data
+            setSelectedSentenceData(null);
+            await fetchSentencesForReview(false);
+            
+        } catch (error) {
+            console.error('Undo rejection error:', error);
+            showSnackbar(`Undo failed: ${error.message}.`, 'error');
+        } finally {
+            setIsReviewSubmitting(false);
+        }
+    };
 
     const handleTagReview = async (tagId, action, tagText, currentComment) => {
         if (!selectedSentenceData) return;
@@ -256,28 +328,55 @@ export default function SentenceReviewPanel() {
                             <Alert severity="info" sx={{mb: 3}}>
                                 No tags exist for this sentence (staged or approved).
                             </Alert>
-                            
-                            
                         </Box>
-                   ) : (
+                ) : (
                         <Box sx={{maxHeight: '30vh', overflowY: 'auto', pr: 1, mb: 2}}>
                             {sentenceData.tags.map((tag, index) => {
                                 const tagIsPending = tag.review_status === 'Pending';
+                                const tagIsApproved = tag.review_status === 'Approved';
+                                const tagIsRejected = tag.review_status === 'Rejected';
                                 const tagId = tag._id;
                                 const currentComment = tagComments[tagId] || tag.review_comments || '';
 
                                 return (
-                                    <Box key={tagId} sx={{ mb: 2, p: 1.5, border: `1px solid ${tagIsPending ? theme.palette.warning.light : theme.palette.success.light}`, borderRadius: 1 }}>
+                                    <Box key={tagId} sx={{ 
+                                        mb: 2, 
+                                        p: 1.5, 
+                                        border: `1px solid ${
+                                            tagIsPending ? theme.palette.warning.light : 
+                                            tagIsApproved ? theme.palette.success.light :
+                                            theme.palette.error.light
+                                        }`, 
+                                        borderRadius: 1,
+                                        backgroundColor: tagIsRejected ? theme.palette.error.light + '20' : 'transparent'
+                                    }}>
                                         
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                             <Box>
                                                 <Typography variant="body1" fontWeight="bold">
                                                     {tag.text} 
-                                                    <Chip label={tag.tag} size="small" color={tagIsPending ? 'warning' : 'success'} sx={{ ml: 1, height: 20, fontSize: '0.75rem' }} />
+                                                    <Chip 
+                                                        label={tag.tag} 
+                                                        size="small" 
+                                                        color={
+                                                            tagIsPending ? 'warning' : 
+                                                            tagIsApproved ? 'success' : 'error'
+                                                        } 
+                                                        sx={{ ml: 1, height: 20, fontSize: '0.75rem' }} 
+                                                    />
                                                 </Typography>
                                                 <Typography variant="caption" color="text.secondary">
-                                                    By: {tag.username} | Status: <span style={{ color: tagIsPending ? theme.palette.warning.dark : theme.palette.success.dark }}>{tag.review_status}</span>
+                                                    By: {tag.username} | Status: <span style={{ 
+                                                        color: tagIsPending ? theme.palette.warning.dark : 
+                                                            tagIsApproved ? theme.palette.success.dark :
+                                                            theme.palette.error.dark 
+                                                    }}>{tag.review_status}</span>
                                                 </Typography>
+                                                {tagIsRejected && tag.review_comments && (
+                                                    <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
+                                                        Rejection reason: {tag.review_comments}
+                                                    </Typography>
+                                                )}
                                             </Box>
                                             
                                             {/* PER-TAG ACTION BUTTONS */}
@@ -305,14 +404,64 @@ export default function SentenceReviewPanel() {
                                                             Approve
                                                         </Button>
                                                     </>
-                                                ) : (
-                                                    <Chip label="Final" color="success" size="small" variant="outlined" />
-                                                )}
+                                                ) : tagIsApproved ? (
+                                                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                                        <Chip 
+                                                            label="Approved" 
+                                                            color="success" 
+                                                            size="small" 
+                                                            variant="outlined" 
+                                                        />
+                                                        <Button 
+                                                            variant="outlined" 
+                                                            size="small"
+                                                            onClick={() => handleUndoApproval(tagId, tag.text)} 
+                                                            startIcon={isReviewSubmitting ? <CircularProgress size={16} /> : <UndoIcon />}
+                                                            color="warning"
+                                                            disabled={isReviewSubmitting}
+                                                            sx={{ 
+                                                                borderColor: theme.palette.warning.main,
+                                                                color: theme.palette.warning.dark,
+                                                                '&:hover': {
+                                                                    backgroundColor: theme.palette.warning.light,
+                                                                }
+                                                            }}
+                                                        >
+                                                            Undo
+                                                        </Button>
+                                                    </Box>
+                                                ) : tagIsRejected ? (
+                                                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                                        <Chip 
+                                                            label="Rejected" 
+                                                            color="error" 
+                                                            size="small" 
+                                                            variant="outlined" 
+                                                        />
+                                                        <Button 
+                                                            variant="outlined" 
+                                                            size="small"
+                                                            onClick={() => handleUndoRejection(tagId, tag.text)} 
+                                                            startIcon={isReviewSubmitting ? <CircularProgress size={16} /> : <UndoIcon />}
+                                                            color="warning"
+                                                            disabled={isReviewSubmitting}
+                                                            sx={{ 
+                                                                borderColor: theme.palette.warning.main,
+                                                                color: theme.palette.warning.dark,
+                                                                '&:hover': {
+                                                                    backgroundColor: theme.palette.warning.light,
+                                                                }
+                                                            }}
+                                                        >
+                                                            Undo
+                                                        </Button>
+                                                    </Box>
+                                                ) : null}
                                             </Box>
                                         </Box>
 
-                                        {/* TAG-SPECIFIC COMMENT FIELD */}
-                                        {(tagIsPending || (tag.review_comments && tag.review_comments.length > 0)) && (
+                                        {/* TAG-SPECIFIC COMMENT FIELD - Show for pending tags or rejected tags with comments */}
+                                        {(tagIsPending || tagIsRejected) && (
                                             <TextField
                                                 fullWidth
                                                 size="small"
@@ -320,10 +469,15 @@ export default function SentenceReviewPanel() {
                                                 rows={1}
                                                 value={currentComment}
                                                 onChange={(e) => setTagComments(prev => ({ ...prev, [tagId]: e.target.value }))}
-                                                placeholder="Enter comment for this specific tag..."
+                                                placeholder={
+                                                    tagIsPending ? "Enter comment for this specific tag..." :
+                                                    "Rejection reason (required for rejection)..."
+                                                }
                                                 variant="filled"
                                                 sx={{ mt: 1, backgroundColor: 'white' }}
                                                 disabled={!tagIsPending || isReviewSubmitting}
+                                                error={tagIsRejected && !currentComment.trim()}
+                                                helperText={tagIsRejected && !currentComment.trim() ? "Comment is required for rejection" : ""}
                                             />
                                         )}
                                     </Box>
@@ -366,12 +520,10 @@ export default function SentenceReviewPanel() {
             effectiveReviewStatus = sentence.review_status || 'Pending';
         }
 
-        // Determine accent color based on effective status
         let accentColor = theme.palette.grey[300]; 
         if (effectiveReviewStatus === 'Pending') {
             accentColor = theme.palette.warning.main; 
         } else if (effectiveReviewStatus === 'Approved') {
-            // Use the custom pastel accent color for the border.
             accentColor = PASTEL_ACCENT_HEX; 
         } else if (effectiveReviewStatus === 'Rejected') {
             accentColor = theme.palette.error.main; 
@@ -535,7 +687,6 @@ export default function SentenceReviewPanel() {
                 </Box>
             </Box>
 
-            /* Snackbar */
             <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={handleCloseSnackbar}>
                 <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
                     {snackbar.message}

@@ -104,7 +104,6 @@ const AnalyticsDashboard = () => {
         window.location.href = '/login';
     };
 
-    // Enhanced data fetching with error handling
     const fetchInitialData = useCallback(async () => {
         setLoading(true);
         setError('');
@@ -115,12 +114,6 @@ const AnalyticsDashboard = () => {
                 fetch(`${API_BASE_URL}/api/analytics/mwe-distribution`, {
                     headers: getAuthHeaders()
                 }),
-                fetch(`${API_BASE_URL}/api/analytics/mwe-network`, {
-                    headers: getAuthHeaders()
-                }),
-                fetch(`${API_BASE_URL}/api/analytics/annotation-timeline`, {
-                    headers: getAuthHeaders()
-                }),
                 fetch(`${API_BASE_URL}/api/analytics/comprehensive-report?level=standard`, {
                     headers: getAuthHeaders()
                 }),
@@ -129,33 +122,24 @@ const AnalyticsDashboard = () => {
                 })
             ];
 
-            const [mweRes, networkRes, timelineRes, comprehensiveRes, projectsRes] = await Promise.allSettled(endpoints.map(p => p.catch(e => ({ ok: false, status: 500 }))));
+            const [mweRes, comprehensiveRes, projectsRes] = await Promise.allSettled(endpoints);
 
-            // Process MWE data
+            // Process MWE data with better error handling
             if (mweRes.status === 'fulfilled' && mweRes.value.ok) {
                 const mweData = await mweRes.value.json();
+                console.log("MWE Data:", mweData);
                 setAnalyticsData(mweData);
-            }
-
-            // Process network data
-            if (networkRes.status === 'fulfilled' && networkRes.value.ok) {
-                const networkData = await networkRes.value.json();
-                setNetworkData(networkData);
+            } else {
+                console.error("MWE data fetch failed:", mweRes.reason);
             }
 
             // Process comprehensive data
             if (comprehensiveRes.status === 'fulfilled' && comprehensiveRes.value.ok) {
                 const comprehensiveData = await comprehensiveRes.value.json();
+                console.log("Comprehensive Data:", comprehensiveData);
                 setComprehensiveData(comprehensiveData);
                 
-                // Generate notifications from insights
                 generateNotifications(comprehensiveData);
-            }
-
-            // Process timeline data
-            if (timelineRes.status === 'fulfilled' && timelineRes.value.ok) {
-                const timelineData = await timelineRes.value.json();
-                setTimelineData(timelineData);
             }
 
             // Process projects
@@ -283,10 +267,9 @@ const AnalyticsDashboard = () => {
         fetchInitialData();
     };
 
-    // Enhanced Stat Card Component
     const EnhancedStatCard = ({ title, value, change, icon, color, subtitle, loading }) => (
         <motion.div variants={itemVariants}>
-            <Card  className="stat-card"
+            <Card className="stat-card"
                 sx={{ 
                     height: '100%',
                     background: `linear-gradient(135deg, ${color}20 0%, ${color}10 100%)`,
@@ -295,17 +278,6 @@ const AnalyticsDashboard = () => {
                     position: 'relative',
                     overflow: 'visible',
                     backdropFilter: 'blur(20px)',
-                    '&::before': {
-                        content: '""',
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        height: '4px',
-                        background: COLOR_PALETTE.gradient.primary,
-                        borderTopLeftRadius: '12px',
-                        borderTopRightRadius: '12px'
-                    }
                 }}
             >
                 <CardContent sx={{ p: 3, position: 'relative' }}>
@@ -328,7 +300,7 @@ const AnalyticsDashboard = () => {
                                             mb: 0.5
                                         }}
                                     >
-                                        {value?.toLocaleString() || '0'}
+                                        {value !== undefined && value !== null ? value.toLocaleString() : '0'}
                                     </Typography>
                                     <Typography 
                                         variant="body2" 
@@ -353,29 +325,6 @@ const AnalyticsDashboard = () => {
                                     {icon}
                                 </Avatar>
                             </Box>
-                            
-                            {change && (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <TrendingUpIcon 
-                                        sx={{ 
-                                            fontSize: 16,
-                                            color: change > 0 ? COLOR_PALETTE.success : COLOR_PALETTE.error
-                                        }} 
-                                    />
-                                    <Typography 
-                                        variant="caption" 
-                                        sx={{ 
-                                            color: change > 0 ? COLOR_PALETTE.success : COLOR_PALETTE.error,
-                                            fontWeight: 600
-                                        }}
-                                    >
-                                        {change > 0 ? '+' : ''}{change}%
-                                    </Typography>
-                                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                        from last period
-                                    </Typography>
-                                </Box>
-                            )}
                             
                             {subtitle && (
                                 <Typography 
@@ -429,11 +378,41 @@ const AnalyticsDashboard = () => {
         </Card>
     );
 
-    // Render different dashboard sections
     const renderOverview = () => {
+        // Fix data extraction to match your backend response structure
         const summary = comprehensiveData?.executive_summary || analyticsData?.summary || {};
-        const userPerformance = comprehensiveData?.user_performance || [];
+        const userPerformance = comprehensiveData?.user_performance || analyticsData?.user_distribution || [];
         const topPerformers = userPerformance.slice(0, 5);
+
+        // Debug logging to see what data you're actually getting
+        console.log("Comprehensive Data:", comprehensiveData);
+        console.log("Analytics Data:", analyticsData);
+        console.log("Summary:", summary);
+
+        // Extract actual values with proper fallbacks
+        const totalAnnotations = summary.total_annotations || 
+                            analyticsData?.summary?.total_annotations || 
+                            comprehensiveData?.quality_metrics?.total_annotations || 0;
+        
+        const totalUsers = summary.total_users || 
+                        analyticsData?.summary?.total_users || 
+                        (comprehensiveData?.user_performance ? comprehensiveData.user_performance.length : 0) || 0;
+        
+        const totalProjects = summary.total_projects || 
+                            analyticsData?.summary?.total_projects || 
+                            (comprehensiveData?.project_progress ? comprehensiveData.project_progress.length : 0) || 0;
+        
+        const totalMweTypes = summary.total_mwe_types || 
+                            analyticsData?.summary?.total_mwe_types || 
+                            (analyticsData?.mwe_types ? analyticsData.mwe_types.length : 0) || 0;
+
+        const avgAnnotationsPerUser = summary.avg_annotations_per_user || 
+                                    analyticsData?.summary?.avg_annotations_per_user || 
+                                    (totalAnnotations / Math.max(totalUsers, 1)).toFixed(1);
+
+        const completedProjects = summary.completed_projects || 
+                                (comprehensiveData?.project_progress ? 
+                                comprehensiveData.project_progress.filter(p => p.status === 'Completed').length : 0) || 0;
 
         return (
             <motion.div variants={containerVariants} initial="hidden" animate="visible">
@@ -444,18 +423,18 @@ const AnalyticsDashboard = () => {
                             <Grid item xs={12} sm={6} md={3}>
                                 <EnhancedStatCard
                                     title="Total Annotations"
-                                    value={summary.total_annotations}
+                                    value={totalAnnotations}
                                     change={12.5}
                                     icon={<AssessmentIcon />}
                                     color={COLOR_PALETTE.primary}
-                                    subtitle={`${summary.avg_annotations_per_user || 0} avg per user`}
+                                    subtitle={`${avgAnnotationsPerUser} avg per user`}
                                     loading={loading}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6} md={3}>
                                 <EnhancedStatCard
                                     title="Active Users"
-                                    value={summary.total_users}
+                                    value={totalUsers}
                                     change={8.2}
                                     icon={<PeopleIcon />}
                                     color={COLOR_PALETTE.success}
@@ -466,18 +445,18 @@ const AnalyticsDashboard = () => {
                             <Grid item xs={12} sm={6} md={3}>
                                 <EnhancedStatCard
                                     title="Projects"
-                                    value={summary.total_projects}
+                                    value={totalProjects}
                                     change={15.7}
                                     icon={<FolderIcon />}
                                     color={COLOR_PALETTE.warning}
-                                    subtitle={`${summary.completed_projects || 0} completed`}
+                                    subtitle={`${completedProjects} completed`}
                                     loading={loading}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6} md={3}>
                                 <EnhancedStatCard
                                     title="MWE Types"
-                                    value={summary.total_mwe_types}
+                                    value={totalMweTypes}
                                     change={5.3}
                                     icon={<LanguageIcon />}
                                     color={COLOR_PALETTE.secondary}
@@ -488,6 +467,7 @@ const AnalyticsDashboard = () => {
                         </Grid>
                     </Grid>
 
+                    {/* Rest of your overview component remains the same */}
                     {/* Charts and Metrics Row */}
                     <Grid item xs={12} lg={8}>
                         <Grid container spacing={3}>
@@ -604,7 +584,7 @@ const AnalyticsDashboard = () => {
                                     </Typography>
                                     <List dense>
                                         {topPerformers.map((user, index) => (
-                                            <ListItem key={user.username} sx={{ px: 0 }}>
+                                            <ListItem key={user.username || user._id} sx={{ px: 0 }}>
                                                 <ListItemIcon sx={{ minWidth: 40 }}>
                                                     <Avatar 
                                                         sx={{ 
@@ -618,16 +598,24 @@ const AnalyticsDashboard = () => {
                                                     </Avatar>
                                                 </ListItemIcon>
                                                 <ListItemText
-                                                    primary={user.username}
-                                                    secondary={`${user.total_annotations} annotations`}
+                                                    primary={user.username || user._id}
+                                                    secondary={`${user.total_annotations || user.count || 0} annotations`}
                                                 />
                                                 <Chip 
-                                                    label={`${user.unique_mwe_count || user.mwe_type_count} types`}
+                                                    label={`${user.unique_mwe_count || user.mwe_type_count || 0} types`}
                                                     size="small"
                                                     variant="outlined"
                                                 />
                                             </ListItem>
                                         ))}
+                                        {topPerformers.length === 0 && (
+                                            <ListItem>
+                                                <ListItemText 
+                                                    primary="No performance data available"
+                                                    sx={{ textAlign: 'center', color: 'text.secondary' }}
+                                                />
+                                            </ListItem>
+                                        )}
                                     </List>
                                 </Paper>
                             </Grid>
@@ -660,6 +648,14 @@ const AnalyticsDashboard = () => {
                                                 />
                                             </ListItem>
                                         ))}
+                                        {notifications.length === 0 && (
+                                            <ListItem>
+                                                <ListItemText 
+                                                    primary="No insights available"
+                                                    sx={{ textAlign: 'center', color: 'text.secondary' }}
+                                                />
+                                            </ListItem>
+                                        )}
                                     </List>
                                 </Paper>
                             </Grid>
@@ -669,7 +665,6 @@ const AnalyticsDashboard = () => {
             </motion.div>
         );
     };
-
     const downloadReport = async (format) => {
         setLoading(true);
         setError('');
