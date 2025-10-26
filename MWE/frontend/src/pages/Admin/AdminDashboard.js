@@ -15,8 +15,6 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
-import GroupAddIcon from '@mui/icons-material/GroupAdd';
-import FeedbackIcon from '@mui/icons-material/Feedback';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead'; 
 import CloseIcon from '@mui/icons-material/Close';
@@ -25,6 +23,10 @@ import AssignUsersDialog from './AssignUsersDialog';
 import EditProjectModal from './EditProjectModal';
 import ContactUsDialog from '../User/ContactUsDialog';
 import TermsDialog from '../User Authentication/TermsDialog';
+import { getAuthHeaders, removeToken } from '../../components/authUtils'; 
+import Navbar from '../../components/Navbar';
+
+
 
 export default function AdminDashboard() {
     const { username } = useParams();
@@ -104,16 +106,22 @@ export default function AdminDashboard() {
         setIsLoading(true);
         try {
             const [projectsResponse, pendingUsersResponse, feedbacksResponse] = await Promise.all([
-                fetch("http://127.0.0.1:5001/api/projects"),
-                fetch("http://127.0.0.1:5001/admin/pending-users"),
-                fetch("http://127.0.0.1:5001/admin/feedbacks") // Fetch feedbacks
+                fetch("http://127.0.0.1:5001/api/projects", {
+                    headers: getAuthHeaders()
+                }),
+                fetch("http://127.0.0.1:5001/admin/pending-users", {
+                    headers: getAuthHeaders()
+                }),
+                fetch("http://127.0.0.1:5001/admin/feedbacks", {
+                    headers: getAuthHeaders()
+                })
             ]);
             
             if (!projectsResponse.ok) {
                 console.error(`Projects API Error: Status ${projectsResponse.status}`);
                 setProjects([]);
                 if (projectsResponse.status === 401 || projectsResponse.status === 403) { 
-                    navigate('/login'); 
+                    handleUnauthorized();
                     return; 
                 }
             } else {
@@ -146,14 +154,17 @@ export default function AdminDashboard() {
         } finally {
             setIsLoading(false); 
         }
-    }, [navigate]);
+    }, []);
 
     useEffect(() => {
         fetchData();
     }, [fetchData]);
 
     // --- Handlers ---
-    const handleLogout = async () => { navigate('/login'); };
+    const handleUnauthorized = () => {
+        removeToken();
+        navigate('/login');
+    };
     const handleAddProject = () => { setIsModalOpen(true); };
     const handleProjectCreated = () => { 
         fetchData(); 
@@ -178,7 +189,8 @@ export default function AdminDashboard() {
 
         try {
             const response = await fetch(`http://127.0.0.1:5001/api/projects/${projectToDelete.id}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: getAuthHeaders()
             });
 
             if (response.ok) {
@@ -187,6 +199,10 @@ export default function AdminDashboard() {
                 setProjects(prev => prev.filter(project => project.id !== projectToDelete.id));
                 showSnackbar(result.message || 'Project deleted successfully!', 'success');
             } else {
+                if (response.status === 401) {
+                    handleUnauthorized();
+                    return;
+                }
                 const errorData = await response.json();
                 showSnackbar(errorData.error || 'Delete failed', 'error');
             }
@@ -216,7 +232,8 @@ export default function AdminDashboard() {
     };
 
     const handleDownload = (projectId, projectName) => { 
-        window.open(`http://127.0.0.1:5001/api/projects/${projectId}/download?format=XML`, '_blank'); 
+        const token = localStorage.getItem('jwt_token');
+        window.open(`http://127.0.0.1:5001/api/projects/${projectId}/download?format=XML&token=${token}`, '_blank'); 
     };
     
  
@@ -231,11 +248,11 @@ export default function AdminDashboard() {
         navigate(`/admin/${username}/approvals`);
     };
 
-    const handleMarkReviewed = async (feedbackId) => {
+     const handleMarkReviewed = async (feedbackId) => {
         try {
             const response = await fetch(`http://127.0.0.1:5001/admin/feedbacks/${feedbackId}/review`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify({ adminUsername: username }) 
             });
 
@@ -243,6 +260,10 @@ export default function AdminDashboard() {
                 fetchData(); // Refresh data to show the updated status
                 showSnackbar(`Feedback ID ${feedbackId} marked as reviewed.`, 'success');
             } else {
+                if (response.status === 401) {
+                    handleUnauthorized();
+                    return;
+                }
                 const errorData = await response.json();
                 showSnackbar(errorData.message || 'Failed to mark as reviewed.', 'error');
             }
@@ -252,17 +273,21 @@ export default function AdminDashboard() {
         }
     };
 
-    // NEW: Delete feedback handler
     const handleDeleteFeedback = async (feedbackId) => {
         try {
             const response = await fetch(`http://127.0.0.1:5001/admin/feedbacks/${feedbackId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: getAuthHeaders()
             });
 
             if (response.ok) {
                 fetchData(); // Refresh data
                 showSnackbar('Feedback deleted successfully!', 'success');
             } else {
+                if (response.status === 401) {
+                    handleUnauthorized();
+                    return;
+                }
                 const errorData = await response.json();
                 showSnackbar(errorData.error || 'Failed to delete feedback', 'error');
             }
@@ -272,6 +297,7 @@ export default function AdminDashboard() {
         }
     };
 
+
     // NEW: Handle image preview
     const handleImagePreview = (filename) => {
         if (filename && filename !== 'None') {
@@ -279,6 +305,11 @@ export default function AdminDashboard() {
             setSelectedImage(imageUrl);
             setImagePreviewOpen(true);
         }
+    };
+
+    const handleLogout = async () => { 
+        removeToken();
+        navigate('/login'); 
     };
 
     // NEW: Close image preview
@@ -624,117 +655,12 @@ const FeedbackDialog = () => (
 
     // --- FIXED: Header Bar with Full Width ---
 const renderHeaderBar = () => (
-    <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        height: '60px', 
-        bgcolor: theme.palette.primary.light, 
-        color: 'black', 
-        p: 2, 
-        width: '100vw',
-        boxSizing: 'border-box',
-        margin: 0,
-        position: 'relative',
-        left: '50%',
-        right: '50%',
-        marginLeft: '-50vw',
-        marginRight: '-50vw'
-    }}>
-        
-        
-        <Typography variant="h6" fontWeight={500} sx={{ mx: 1 }}>Multiword Expression Workbench</Typography>
-        
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}> 
-            
-             <Badge 
-                    badgeContent={feedbacks.filter(f => !f.is_reviewed).length} 
-                    color="error" 
-                    sx={{ mr: 1 }}
-                >
-                    <Button 
-                        variant="outlined" 
-                        size="small" 
-                        startIcon={<FeedbackIcon />}
-                        onClick={handleOpenFeedbackDialog}
-                        sx={{ 
-                            color: 'black', 
-                            borderColor: 'black',
-                            minWidth: 'auto', 
-                            p: '4px 8px',
-                            '&:hover': {
-                                backgroundColor: theme.palette.primary.main,
-                                color: 'white'
-                            }
-                        }}
-                    >
-                        FEEDBACKS
-                    </Button>
-            </Badge>
-            {/* NEW: Analytics Dashboard Button */}
-            <Button 
-                variant="outlined" 
-                size="small" 
-                onClick={() => navigate(`/admin/${username}/analytics`)}
-                sx={{ 
-                    color: 'black', 
-                    borderColor: 'black',
-                    minWidth: 'auto', 
-                    p: '4px 8px',
-                    '&:hover': {
-                        backgroundColor: theme.palette.primary.main,
-                        color: 'white'
-                    }
-                }}
-            >
-                ANALYTICS
-            </Button>
-            
-            {/* NEW: Approve Users Button with Badge */}
-            <Badge 
-                badgeContent={pendingUsersCount} 
-                color="error" 
-                sx={{ mr: 1 }}
-            >
-                <Button 
-                    variant="outlined" 
-                    size="small" 
-                    startIcon={<GroupAddIcon />}
-                    onClick={handleApproveUsers}
-                    sx={{ 
-                        color: 'black', 
-                        borderColor: 'black',
-                        minWidth: 'auto', 
-                        p: '4px 8px',
-                        '&:hover': {
-                            backgroundColor: theme.palette.primary.main,
-                            color: 'white'
-                        }
-                    }}
-                >
-                    APPROVE USERS
-                </Button>
-            </Badge>
-            
-            <Button 
-                variant="outlined" 
-                size="small" 
-                sx={{ 
-                    color: 'black', 
-                    borderColor: 'black', 
-                    minWidth: 'auto', 
-                    p: '4px 8px',
-                    '&:hover': {
-                        backgroundColor: theme.palette.primary.main,
-                        color: 'white'
-                    }
-                }} 
-                onClick={handleLogout}
-            >
-                LOG OUT
-            </Button>
-        </Box>
-    </Box>
+    <Navbar 
+        username={username}
+        pendingUsersCount={pendingUsersCount}
+        feedbacks={feedbacks}
+        onOpenFeedbackDialog={handleOpenFeedbackDialog}
+    />
 );
 
     // --- Main Render ---

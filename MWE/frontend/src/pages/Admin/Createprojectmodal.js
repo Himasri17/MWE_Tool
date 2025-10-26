@@ -8,6 +8,7 @@ import {
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import SendIcon from '@mui/icons-material/Send';
 import CloseIcon from '@mui/icons-material/Close';
+import { getAuthHeadersMultipart, getAuthHeaders } from '../../components/authUtils'; 
 
 // Visually hidden input for file upload
 const VisuallyHiddenInput = (props) => (
@@ -35,19 +36,19 @@ export default function CreateProjectModal({ isOpen, onClose, adminUsername, onP
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoadingUsers, setIsLoadingUsers] = useState(false); 
 
-
     useEffect(() => {
         if (isOpen) {
             fetchAvailableUsers();
         }
     }, [isOpen]);
-    // --- Reset Form Function ---
 
     // NEW: Function to fetch available users
     const fetchAvailableUsers = async () => {
         setIsLoadingUsers(true);
         try {
-            const response = await fetch('http://127.0.0.1:5001/api/users-list');
+            const response = await fetch('http://127.0.0.1:5001/api/users-list', {
+                headers: getAuthHeaders()
+            });
             if (response.ok) {
                 const users = await response.json();
                 setAvailableUsers(users);
@@ -99,6 +100,7 @@ export default function CreateProjectModal({ isOpen, onClose, adminUsername, onP
         try {
             const response = await fetch('http://127.0.0.1:5001/api/projects', {
                 method: 'POST',
+                headers: getAuthHeadersMultipart(),
                 body: formData,
             });
 
@@ -129,7 +131,6 @@ export default function CreateProjectModal({ isOpen, onClose, adminUsername, onP
             fullWidth
             PaperProps={{ component: 'form', onSubmit: handleSubmit }}
         >
-            {/* FIXED: Remove nested Typography to prevent h6 inside h2 */}
             <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: theme.palette.primary.main, color: 'white' }}>
                 Add Project
                 <IconButton onClick={handleClose} sx={{ color: 'white' }}>

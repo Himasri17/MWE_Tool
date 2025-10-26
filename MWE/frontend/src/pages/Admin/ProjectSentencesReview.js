@@ -8,6 +8,9 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import InfoIcon from '@mui/icons-material/Info';
+import { getAuthHeaders, removeToken } from '../../components/authUtils';
+import Navbar from '../../components/Navbar';
+
 
 export default function ProjectSentencesReview() {
     const { username, projectId, targetUsername } = useParams();
@@ -25,7 +28,11 @@ export default function ProjectSentencesReview() {
     const [debugInfo, setDebugInfo] = useState(null);
     const sentencesPerPage = 6; 
 
-    // --- Data Fetching ---
+    const handleUnauthorized = () => {
+        removeToken();
+        navigate('/login');
+    };
+
     const fetchSentencesForReview = useCallback(async (showLoading = true) => {
         if (showLoading) setIsLoading(true);
         setError(null);
@@ -34,11 +41,17 @@ export default function ProjectSentencesReview() {
         try {
             console.log(`🔄 Fetching sentences for project: ${projectId}, user: ${targetUsername}`);
             
-            const response = await fetch(`http://127.0.0.1:5001/api/projects/${projectId}/sentences?username=${targetUsername}`);
+            const response = await fetch(`http://127.0.0.1:5001/api/projects/${projectId}/sentences?username=${targetUsername}`, {
+                headers: getAuthHeaders()
+            });
             
             console.log(`📡 Response status: ${response.status}`);
             
             if (!response.ok) {
+                if (response.status === 401) {
+                    handleUnauthorized();
+                    return;
+                }
                 const errorText = await response.text();
                 throw new Error(`Server returned ${response.status}: ${errorText}`);
             }
@@ -82,12 +95,16 @@ export default function ProjectSentencesReview() {
         fetchSentencesForReview(false);
     };
 
+
     useEffect(() => {
         fetchSentencesForReview();
     }, [fetchSentencesForReview]);
 
     // --- Handlers ---
-    const handleLogout = async () => { navigate('/login'); };
+    const handleLogout = async () => { 
+        removeToken();
+        navigate('/login'); 
+    };
     const handleBack = () => {
         navigate(`/admin/${username}`);
     };
@@ -301,26 +318,8 @@ export default function ProjectSentencesReview() {
 
     return (
         <Box sx={{ minHeight: '100vh', width: '100vw', overflow: 'hidden', margin: 0, padding: 0 }}>
-            {/* Header Bar */}
-            <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                height: '60px', 
-                bgcolor: theme.palette.primary.light, 
-                color: 'black', 
-                p: 2, 
-                width: '100vw',
-                boxSizing: 'border-box',
-                margin: 0
-            }}>
-                
-                <Typography variant="h6" fontWeight={500} sx={{ mx: 1 }}>Multiword Expression Workbench</Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}> 
-                    <Typography variant="body1">Admin: {username}</Typography>
-                    <Button variant="outlined" size="small" sx={{ color: 'black', borderColor: 'black' }} onClick={handleLogout}>LOG OUT</Button>
-                </Box>
-            </Box>
+            <Navbar username={username} showFeedbackBadge={false} />
+        
 
             {/* Main Content */}
             <Box sx={{ 

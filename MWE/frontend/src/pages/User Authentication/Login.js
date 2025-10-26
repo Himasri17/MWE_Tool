@@ -9,7 +9,8 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import PersonIcon from '@mui/icons-material/Person';
 import LockIcon from '@mui/icons-material/Lock';
 import TermsDialog from './TermsDialog';
-import SupportDialog from './SupportDialog'; // Add this import
+import SupportDialog from './SupportDialog';
+import { setToken } from '../../components/authUtils'; 
 
 export default function Login() {
     const [username, setUsername] = useState('');
@@ -17,13 +18,15 @@ export default function Login() {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [termsDialogOpen, setTermsDialogOpen] = useState(false);
-    const [supportDialogOpen, setSupportDialogOpen] = useState(false); // Add this state
+    const [supportDialogOpen, setSupportDialogOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(false); // Add loading state
     const navigate = useNavigate();
     const theme = useTheme();
 
     const handleLogin = async (event) => {
         event.preventDefault();
         setError('');
+        setIsLoading(true);
 
         try {
             const response = await fetch('http://127.0.0.1:5001/login', {
@@ -45,6 +48,12 @@ export default function Login() {
                 return;
             }
 
+            // Store JWT token
+            if (data.token) {
+                setToken(data.token);
+                console.log('JWT token stored successfully');
+            }
+
             // Login successful and approved: Conditional Navigation
             if (data.role === "admin") {
                 navigate(`/admin/${username}`);
@@ -59,6 +68,8 @@ export default function Login() {
         } catch (err) {
             setError('Network error. Please try again later.');
             console.error('Network error:', err);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -92,6 +103,7 @@ export default function Login() {
                             InputProps={{ 
                                 startAdornment: (<InputAdornment position="start"><PersonIcon color="action" /></InputAdornment>), 
                             }} 
+                            disabled={isLoading}
                         />
                         <TextField 
                             fullWidth 
@@ -107,11 +119,12 @@ export default function Login() {
                             sx={{ mb: 1 }}
                             InputProps={{
                                 startAdornment: (<InputAdornment position="start"><LockIcon color="action" /></InputAdornment>),
-                                endAdornment: (<InputAdornment position="end"><IconButton aria-label="toggle password visibility" onClick={handleClickShowPassword} onMouseDown={handleMouseDownPassword} edge="end">{showPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment>),
+                                endAdornment: (<InputAdornment position="end"><IconButton aria-label="toggle password visibility" onClick={handleClickShowPassword} onMouseDown={handleMouseDownPassword} edge="end" disabled={isLoading}>{showPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment>),
                             }}
+                            disabled={isLoading}
                         />
                         
-                        {/* Forgot Password Link - UPDATED: Navigates to forgot password page */}
+                        {/* Forgot Password Link */}
                         <Box sx={{ textAlign: 'right', mb: 2 }}>
                             <MuiLink 
                                 component={Link} 
@@ -129,7 +142,16 @@ export default function Login() {
                             </Typography>
                         )}
 
-                        <Button type="submit" fullWidth variant="contained" size="large" sx={{ mt: 1, mb: 2, py: 1.5, fontWeight: 'bold', letterSpacing: 1 }}>Sign In</Button>
+                        <Button 
+                            type="submit" 
+                            fullWidth 
+                            variant="contained" 
+                            size="large" 
+                            sx={{ mt: 1, mb: 2, py: 1.5, fontWeight: 'bold', letterSpacing: 1 }}
+                            disabled={isLoading}
+                        >
+                            {isLoading ? 'Signing In...' : 'Sign In'}
+                        </Button>
                         
                         <Typography align="center" variant="body2" color="text.secondary">
                             Don't have an account?{' '}<MuiLink component={Link} to="/register" underline="hover">Sign Up</MuiLink>
@@ -138,7 +160,7 @@ export default function Login() {
                 </Paper>
             </Container>
 
-            {/* Optional Footer for a complete professional look */}
+            {/* Footer */}
             <Box component="footer" sx={{ py: 3, px: 2, mt: 'auto', backgroundColor: theme.palette.grey[200], width: '100%', borderTop: `1px solid ${theme.palette.divider}` }}>
                 <Container maxWidth="lg">
                     <Grid container justifyContent="space-around" alignItems="center">
@@ -164,7 +186,6 @@ export default function Login() {
                                 Terms
                             </MuiLink>
                         </Grid>
-                        
                     </Grid>
                     <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 2 }}>
                         {'© 2025 Annotation Platform. All rights reserved.'}

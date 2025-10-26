@@ -1,5 +1,6 @@
 // Update AdminApprovalList.js - Fix the refresh logic
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect} from 'react';
+import { useParams } from 'react-router-dom';
 import { 
     Container, Button, Typography, List, ListItem, Box, 
     Divider, CircularProgress, Paper, useTheme, Dialog, DialogTitle, 
@@ -8,6 +9,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import CancelIcon from '@mui/icons-material/Cancel';
+import Navbar from '../../components/Navbar'; 
 
 export default function AdminApprovalList() {
     const [pendingUsers, setPendingUsers] = useState([]);
@@ -18,6 +20,7 @@ export default function AdminApprovalList() {
     const [actionInProgress, setActionInProgress] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
     const theme = useTheme();
+    const { username } = useParams(); 
 
     // 1. Fetch unapproved users
     const fetchPendingUsers = async () => {
@@ -130,6 +133,8 @@ export default function AdminApprovalList() {
     };
 
     return (
+        <Box sx={{ minHeight: '100vh', width: '100vw', overflow: 'hidden' }}>
+            <Navbar username={username} />
         <Container maxWidth="md" sx={{ mt: 5 }}>
             <Paper elevation={4} sx={{ p: 4 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -284,5 +289,6 @@ export default function AdminApprovalList() {
                 </Alert>
             </Snackbar>
         </Container>
+        </Box>
     );
 }

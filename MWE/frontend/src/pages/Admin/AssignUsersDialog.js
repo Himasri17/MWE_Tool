@@ -5,6 +5,8 @@ import {
     Button, FormControl, InputLabel, Select, MenuItem,
     Chip, Box, Typography, CircularProgress, Alert
 } from '@mui/material';
+import { getAuthHeaders } from '../../components/authUtils';    
+
 
 export default function AssignUsersDialog({ open, onClose, projectId, projectName, adminUsername }) {
     const [availableUsers, setAvailableUsers] = useState([]);
@@ -17,7 +19,9 @@ export default function AssignUsersDialog({ open, onClose, projectId, projectNam
     const fetchAvailableUsers = async () => {
         setIsLoading(true);
         try {
-            const response = await fetch('http://127.0.0.1:5001/api/users-list');
+            const response = await fetch('http://127.0.0.1:5001/api/users-list', {
+                headers: getAuthHeaders()
+            });
             if (response.ok) {
                 const users = await response.json();
                 setAvailableUsers(users);
@@ -52,9 +56,7 @@ export default function AssignUsersDialog({ open, onClose, projectId, projectNam
         try {
             const response = await fetch(`http://127.0.0.1:5001/api/projects/${projectId}/assign_user`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: getAuthHeaders(),
                 body: JSON.stringify({
                     users: selectedUsers,
                     adminUsername: adminUsername

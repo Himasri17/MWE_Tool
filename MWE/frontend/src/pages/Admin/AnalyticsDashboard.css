@@ -1,19 +1,22 @@
 /* ===============================================
-   ANALYTICS DASHBOARD - MODERN CSS STYLES
+   ANALYTICS DASHBOARD - COMPLETE ENHANCED CSS
+   FIXED CHART SIZES & READABILITY
    =============================================== */
 
 /* ===== ROOT VARIABLES ===== */
 :root {
-  --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-  --warning-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-  --glass-bg: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(255, 255, 255, 0.18);
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
-  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.16);
+  --primary-gradient: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  --secondary-gradient: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);
+  --success-gradient: linear-gradient(135deg, #10B981 0%, #34D399 100%);
+  --warning-gradient: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%);
+  --info-gradient: linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);
+  
+  --glass-bg: rgba(255, 255, 255, 0.95);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.15);
+  --shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.18);
   --border-radius: 16px;
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -21,12 +24,14 @@
 /* ===== MAIN DASHBOARD CONTAINER ===== */
 .analytics-dashboard {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #e8eaf6 50%, #f3e5f5 100%);
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
+  background-attachment: fixed;
   position: relative;
   overflow-x: hidden;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-/* Animated background pattern */
+/* Enhanced background pattern */
 .analytics-dashboard::before {
   content: '';
   position: fixed;
@@ -35,24 +40,440 @@
   width: 100%;
   height: 100%;
   background-image: 
-    radial-gradient(circle at 20% 50%, rgba(102, 126, 234, 0.05) 0%, transparent 50%),
-    radial-gradient(circle at 80% 80%, rgba(118, 75, 162, 0.05) 0%, transparent 50%),
-    radial-gradient(circle at 40% 20%, rgba(79, 172, 254, 0.05) 0%, transparent 50%);
+    radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.05) 0%, transparent 35%),
+    radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.05) 0%, transparent 35%),
+    radial-gradient(circle at 30% 90%, rgba(16, 185, 129, 0.03) 0%, transparent 35%),
+    radial-gradient(circle at 70% 10%, rgba(245, 158, 11, 0.03) 0%, transparent 35%);
+  pointer-events: none;
+  z-index: 0;
+  animation: floatBackground 20s ease-in-out infinite;
+}
+
+/* ===== LARGER CHART CONTAINERS ===== */
+.chart-container {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  transition: var(--transition);
+  overflow: hidden;
+  position: relative;
+  animation: slideUpFade 0.6s ease-out backwards;
+  min-height: 450px; /* Increased minimum height */
+  padding: 24px; /* Added padding */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Main chart containers should be even larger */
+.chart-container.large-chart {
+  min-height: 520px;
+  padding: 28px;
+}
+
+/* ===== SPECIFIC CHART SIZE FIXES ===== */
+
+/* MWE Type Distribution - Make it much larger */
+.chart-container:has(.recharts-bar-chart) {
+  min-height: 480px !important;
+  height: 480px !important;
+}
+
+/* MWE Categories (Pie Chart) - Make it larger */
+.chart-container:has(.recharts-pie-chart) {
+  min-height: 460px !important;
+  height: 460px !important;
+}
+
+/* User Performance Distribution */
+.chart-container:has(.recharts-bar-chart) ~ .chart-container:has(.recharts-bar-chart) {
+  min-height: 520px !important;
+  height: 520px !important;
+}
+
+/* Performance Radar Chart */
+.chart-container:has(.recharts-radar-chart) {
+  min-height: 520px !important;
+  height: 520px !important;
+}
+
+/* Area Charts */
+.chart-container:has(.recharts-area-chart) {
+  min-height: 500px !important;
+  height: 500px !important;
+}
+
+/* Line Charts */
+.chart-container:has(.recharts-line-chart) {
+  min-height: 480px !important;
+  height: 480px !important;
+}
+
+.chart-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--primary-gradient);
+  background-size: 200% 100%;
+  animation: gradientFlow 3s ease infinite;
+  z-index: 2;
+}
+
+.chart-container:hover {
+  box-shadow: var(--shadow-xl);
+  transform: translateY(-4px);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+/* ===== LARGER CHART TITLES ===== */
+.chart-container h6 {
+  color: #111827;
+  font-weight: 700;
+  font-size: 1.4rem !important; /* Larger title */
+  margin-bottom: 28px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #F3F4F6;
+  position: relative;
+  line-height: 1.3;
+}
+
+.chart-container h6::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 50px;
+  height: 3px;
+  background: var(--primary-gradient);
+  transition: width 0.3s ease;
+  border-radius: 2px;
+}
+
+.chart-container:hover h6::after {
+  width: 100px;
+}
+
+/* ===== ENHANCED CHART TEXT SIZES ===== */
+
+/* Axis labels - Much larger */
+.recharts-cartesian-axis-tick-value {
+  fill: #6B7280 !important;
+  font-size: 14px !important; /* Increased from 11px */
+  font-weight: 600 !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+.recharts-polar-angle-axis-tick-value {
+  fill: #6B7280 !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+.recharts-polar-radius-axis-tick-value {
+  fill: #6B7280 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+
+/* Chart labels - Larger */
+.recharts-text {
+  fill: #374151 !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 14px !important; /* Increased from 12px */
+}
+
+/* Legend text - Larger */
+.recharts-legend-item-text {
+  color: #374151 !important;
+  font-weight: 600 !important;
+  font-size: 14px !important; /* Increased from 13px */
+  font-family: 'Inter', sans-serif !important;
+}
+
+/* Tooltip text - Larger */
+.recharts-tooltip-item {
+  font-size: 14px !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 600 !important;
+}
+
+.recharts-tooltip-item-name {
+  font-weight: 600 !important;
+}
+
+.recharts-tooltip-item-value {
+  font-weight: 700 !important;
+}
+
+/* ===== CRITICAL FIXES FOR GRAPH VISIBILITY ===== */
+
+/* Ensure charts are visible and properly styled */
+.recharts-wrapper {
+  font-family: 'Inter', sans-serif !important;
+  flex: 1 !important;
+}
+
+.recharts-surface {
+  border-radius: 12px;
+}
+
+/* Fix chart grid lines */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: #E5E7EB !important;
+  stroke-dasharray: 3 3 !important;
+  stroke-opacity: 0.7 !important;
+}
+
+.recharts-polar-grid line {
+  stroke: #E5E7EB !important;
+  stroke-opacity: 0.7 !important;
+}
+
+/* ===== SPECIFIC CHART ENHANCEMENTS ===== */
+
+/* Bar Charts - Larger bars with better spacing */
+.recharts-bar-rectangle {
+  rx: 6 !important;
+  ry: 6 !important;
+  transition: all 0.3s ease !important;
+}
+
+.recharts-bar-chart .recharts-bar {
+  bar-size: 32 !important; /* Thicker bars */
+}
+
+.recharts-bar-rectangle:hover {
+  opacity: 0.8 !important;
+  transform: scale(1.05) !important;
+}
+
+/* Pie Charts - Larger segments and labels */
+.recharts-pie-sector {
+  stroke: white !important;
+  stroke-width: 3px !important; /* Thicker borders */
+  transition: all 0.3s ease !important;
+}
+
+.recharts-pie-sector:hover {
+  stroke-width: 4px !important;
+  opacity: 0.9 !important;
+}
+
+.recharts-pie-label-text {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  fill: #111827 !important;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8) !important;
+}
+
+.recharts-pie-label-line {
+  stroke: #6B7280 !important;
+  stroke-width: 1px !important;
+}
+
+/* Radar Charts - Larger text and better spacing */
+.recharts-radar-polygon {
+  stroke-width: 2px !important;
+}
+
+.recharts-polar-radius-axis-tick-value {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+
+.recharts-radar-dot {
+  r: 5 !important; /* Larger dots */
+  transition: all 0.3s ease !important;
+}
+
+.recharts-radar-dot:hover {
+  r: 7 !important;
+  stroke-width: 3px !important;
+}
+
+/* Line Charts - Thicker lines */
+.recharts-line-curve {
+  stroke-width: 3px !important;
+  stroke-linecap: round !important;
+}
+
+.recharts-line-dots circle {
+  r: 5 !important; /* Larger dots */
+  transition: all 0.3s ease !important;
+}
+
+.recharts-line-dots circle:hover {
+  r: 7 !important;
+  stroke-width: 3px !important;
+}
+
+/* Area Charts */
+.recharts-area-area {
+  opacity: 0.6 !important;
+}
+
+.recharts-area-curve {
+  stroke-width: 2px !important;
+}
+
+/* ===== ENHANCED TOOLTIP ===== */
+.recharts-tooltip-wrapper {
+  z-index: 1000 !important;
+}
+
+.custom-recharts-tooltip {
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--shadow-xl) !important;
+  padding: 20px !important;
+  animation: tooltipSlideIn 0.2s ease-out !important;
+}
+
+.custom-recharts-tooltip .tooltip-label {
+  color: #111827 !important;
+  font-weight: 700 !important;
+  font-size: 1rem !important;
+  margin-bottom: 8px !important;
+}
+
+.custom-recharts-tooltip .tooltip-value {
+  color: #6366F1 !important;
+  font-weight: 800 !important;
+  font-size: 1.2rem !important;
+}
+
+/* ===== ENHANCED STAT CARDS ===== */
+.stat-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: var(--border-radius);
+  transition: var(--transition);
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  animation: slideUpFade 0.6s ease-out backwards;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--primary-gradient);
+  background-size: 200% 100%;
+  animation: gradientFlow 3s ease infinite;
+}
+
+.stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--primary-gradient);
+  opacity: 0;
+  transition: var(--transition);
+  z-index: 0;
+}
+
+.stat-card:hover::after {
+  opacity: 0.03;
+}
+
+.stat-card:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-xl);
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+/* Stat card content */
+.stat-card .MuiCardContent-root {
+  position: relative;
+  z-index: 1;
+  padding: 24px !important;
+}
+
+.stat-card h4 {
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 800;
+  font-size: 2.5rem;
+  margin-bottom: 8px;
+  line-height: 1;
+}
+
+.stat-card .MuiTypography-body2 {
+  color: #6B7280;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.stat-card .MuiTypography-caption {
+  color: #9CA3AF;
+  font-weight: 500;
+  font-size: 0.8rem;
+}
+
+/* ===== NETWORK GRAPH CONTAINER ===== */
+.network-graph-container {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  position: relative;
+  animation: slideUpFade 0.8s ease-out backwards;
+  min-height: 500px;
+  padding: 24px;
+}
+
+.network-graph-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(139, 92, 246, 0.05) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
 }
 
-/* ===== HEADER SECTION ===== */
+/* ===== HEADER STYLING ===== */
 .dashboard-header {
   background: var(--glass-bg);
   backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--glass-border);
+  border: 1px solid rgba(255, 255, 255, 0.8);
   border-radius: var(--border-radius);
   box-shadow: var(--shadow-lg);
   padding: 32px;
   position: relative;
   overflow: hidden;
-  animation: slideDown 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: slideDown 0.6s ease-out;
+  margin-bottom: 24px;
 }
 
 .dashboard-header::before {
@@ -62,9 +483,9 @@
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #4facfe);
+  background: var(--primary-gradient);
   background-size: 200% 100%;
-  animation: gradientShift 3s ease infinite;
+  animation: gradientFlow 3s ease infinite;
 }
 
 .dashboard-header h4 {
@@ -73,515 +494,158 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
   font-weight: 800;
-  letter-spacing: -0.5px;
+  font-size: 2.25rem;
   margin-bottom: 8px;
+  line-height: 1.2;
 }
 
-/* ===== STAT CARDS ===== */
-.stat-card {
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--border-radius);
-  transition: var(--transition);
-  box-shadow: var(--shadow-md);
-  position: relative;
-  overflow: hidden;
-  cursor: pointer;
-  animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+.dashboard-header .MuiTypography-body1 {
+  color: #6B7280;
+  font-size: 1.1rem;
+  font-weight: 500;
+  line-height: 1.5;
 }
 
-.stat-card:nth-child(1) { animation-delay: 0.1s; }
-.stat-card:nth-child(2) { animation-delay: 0.2s; }
-.stat-card:nth-child(3) { animation-delay: 0.3s; }
-.stat-card:nth-child(4) { animation-delay: 0.4s; }
-
-/* Gradient overlay for stat cards */
-.stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--primary-gradient);
-  opacity: 0;
-  transition: var(--transition);
-  z-index: 0;
-}
-
-.stat-card:hover::before {
-  opacity: 0.1;
-}
-
-.stat-card:hover {
-  transform: translateY(-8px) scale(1.02);
-  box-shadow: var(--shadow-xl);
-  border-color: rgba(102, 126, 234, 0.3);
-}
-
-/* Icon styling within stat cards */
-.stat-card .MuiSvgIcon-root {
-  filter: drop-shadow(0 4px 8px rgba(102, 126, 234, 0.3));
-  transition: var(--transition);
-}
-
-.stat-card:hover .MuiSvgIcon-root {
-  transform: scale(1.1) rotate(5deg);
-}
-
-/* Value number animation */
-.stat-card h4 {
-  background: var(--primary-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  font-weight: 800;
-  position: relative;
-  z-index: 1;
-}
-
-/* ===== CHART CONTAINERS ===== */
-.chart-container {
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow-md);
-  transition: var(--transition);
-  overflow: hidden;
-  position: relative;
-  animation: fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) backwards;
-  animation-delay: 0.3s;
-}
-
-.chart-container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, #667eea, transparent);
-  opacity: 0;
-  transition: var(--transition);
-}
-
-.chart-container:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-4px);
-  border-color: rgba(102, 126, 234, 0.2);
-}
-
-.chart-container:hover::before {
-  opacity: 1;
-}
-
-/* Chart title styling */
-.chart-container h6 {
-  color: #2c3e50;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  position: relative;
-  padding-bottom: 12px;
-  margin-bottom: 16px;
-}
-
-.chart-container h6::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 40px;
-  height: 3px;
-  background: var(--primary-gradient);
-  border-radius: 2px;
-}
-
-/* ===== TABS STYLING ===== */
+/* ===== TABS ENHANCEMENT ===== */
 .analytics-tabs {
   background: var(--glass-bg);
   backdrop-filter: blur(20px) saturate(180%);
   border-radius: var(--border-radius) var(--border-radius) 0 0;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg);
   overflow: hidden;
-  border: 1px solid var(--glass-border);
+  border: 1px solid rgba(255, 255, 255, 0.8);
   border-bottom: none;
+  position: relative;
+  z-index: 10;
+  margin-bottom: 24px;
 }
 
 .analytics-tabs .MuiTab-root {
   font-weight: 600;
   text-transform: none;
-  font-size: 0.95rem;
-  min-height: 72px;
+  font-size: 1rem;
+  min-height: 70px;
   transition: var(--transition);
-  color: #64748b;
+  color: #6B7280;
   position: relative;
   overflow: hidden;
-}
-
-/* Tab hover effect */
-.analytics-tabs .MuiTab-root::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--primary-gradient);
-  opacity: 0;
-  transition: var(--transition);
-}
-
-.analytics-tabs .MuiTab-root:hover::before {
-  opacity: 0.08;
+  padding: 16px 24px;
 }
 
 .analytics-tabs .MuiTab-root:hover {
-  color: #667eea;
+  color: #6366F1;
+  background: rgba(99, 102, 241, 0.04);
 }
 
-/* Selected tab */
 .analytics-tabs .Mui-selected {
-  color: #667eea !important;
+  color: #6366F1 !important;
   font-weight: 700;
+  background: rgba(99, 102, 241, 0.08);
 }
 
-/* Tab indicator */
 .analytics-tabs .MuiTabs-indicator {
   background: var(--primary-gradient);
-  height: 4px;
-  border-radius: 4px 4px 0 0;
-  box-shadow: 0 -2px 8px rgba(102, 126, 234, 0.4);
+  height: 3px;
+  border-radius: 3px 3px 0 0;
 }
 
-/* Tab icons */
 .analytics-tabs .MuiTab-root .MuiSvgIcon-root {
-  margin-bottom: 4px;
-  transition: var(--transition);
+  margin-right: 8px;
+  font-size: 1.25rem;
 }
 
-.analytics-tabs .Mui-selected .MuiSvgIcon-root {
-  transform: scale(1.1);
-  filter: drop-shadow(0 2px 4px rgba(102, 126, 234, 0.3));
-}
+/* ===== RESPONSIVE CHART SIZING ===== */
 
-/* ===== FILTER SECTION ===== */
-.filter-section {
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  box-shadow: var(--shadow-md);
-  padding: 24px;
-  margin-top: 24px;
-  animation: slideDown 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.filter-section h6 {
-  color: #2c3e50;
-  font-weight: 700;
-  margin-bottom: 16px;
-  position: relative;
-  display: inline-block;
-}
-
-.filter-section h6::after {
-  content: '';
-  position: absolute;
-  bottom: -4px;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: var(--primary-gradient);
-  border-radius: 1px;
-}
-
-/* ===== FORM CONTROLS ===== */
-.MuiFormControl-root .MuiOutlinedInput-root {
-  border-radius: 10px;
-  transition: var(--transition);
-  background: rgba(255, 255, 255, 0.7);
-}
-
-.MuiFormControl-root .MuiOutlinedInput-root:hover {
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.MuiFormControl-root .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
-  border-color: #667eea;
-  border-width: 2px;
-}
-
-.MuiFormControl-root .Mui-focused .MuiOutlinedInput-notchedOutline {
-  border-color: #667eea !important;
-  border-width: 2px !important;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.MuiFormControl-root .MuiInputLabel-root {
-  color: #64748b;
-  font-weight: 500;
-}
-
-.MuiFormControl-root .MuiInputLabel-root.Mui-focused {
-  color: #667eea;
-  font-weight: 600;
-}
-
-/* ===== BUTTONS ===== */
-.dashboard-button {
-  border-radius: 10px;
-  font-weight: 600;
-  text-transform: none;
-  transition: var(--transition);
-  box-shadow: var(--shadow-sm);
-  padding: 10px 24px;
-  position: relative;
-  overflow: hidden;
-}
-
-.dashboard-button::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
-  transform: translate(-50%, -50%);
-  transition: width 0.6s, height 0.6s;
-}
-
-.dashboard-button:hover::before {
-  width: 300px;
-  height: 300px;
-}
-
-.dashboard-button:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-}
-
-.dashboard-button:active {
-  transform: translateY(0);
-}
-
-/* Download buttons with gradients */
-.download-button {
-  background: var(--primary-gradient);
-  color: white;
-  border: none;
-}
-
-.download-button:hover {
-  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
-  transform: translateY(-3px);
-}
-
-.MuiButton-outlined {
-  border: 2px solid #667eea;
-  color: #667eea;
-  background: rgba(102, 126, 234, 0.04);
-}
-
-.MuiButton-outlined:hover {
-  background: rgba(102, 126, 234, 0.1);
-  border-color: #764ba2;
-  color: #764ba2;
-}
-
-/* ===== NETWORK GRAPH ===== */
-.network-graph-container {
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow-md);
-  overflow: hidden;
-  position: relative;
-}
-
-.network-graph-container::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at center, rgba(102, 126, 234, 0.02), transparent);
-  pointer-events: none;
-}
-
-/* ===== CHIPS ===== */
-.MuiChip-outlined {
-  border: 2px solid #667eea;
-  color: #667eea;
-  font-weight: 600;
-  background: rgba(102, 126, 234, 0.05);
-  transition: var(--transition);
-}
-
-.MuiChip-outlined:hover {
-  background: rgba(102, 126, 234, 0.15);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-sm);
-}
-
-/* ===== CUSTOM TOOLTIP ===== */
-.custom-tooltip {
-  background: var(--glass-bg) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  border: 1px solid var(--glass-border) !important;
-  border-radius: 10px !important;
-  box-shadow: var(--shadow-lg) !important;
-  padding: 12px 16px !important;
-  animation: tooltipFadeIn 0.2s ease;
-}
-
-.custom-tooltip .tooltip-label {
-  font-weight: 700;
-  color: #2c3e50;
-  margin-bottom: 4px;
-}
-
-.custom-tooltip .tooltip-value {
-  font-weight: 600;
-}
-
-/* ===== LOADING STATE ===== */
-.loading-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 200px;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.loading-spinner {
-  color: #667eea !important;
-  animation: spinPulse 1.5s ease-in-out infinite;
-}
-
-/* ===== ALERTS ===== */
-.error-alert {
-  border-radius: 12px;
-  border: 1px solid rgba(244, 67, 54, 0.3);
-  box-shadow: 0 4px 16px rgba(244, 67, 54, 0.15);
-  backdrop-filter: blur(10px);
-  animation: slideDown 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* ===== SCROLLBAR ===== */
-.analytics-dashboard ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.analytics-dashboard ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 10px;
-}
-
-.analytics-dashboard ::-webkit-scrollbar-thumb {
-  background: var(--primary-gradient);
-  border-radius: 10px;
-  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.1);
-}
-
-.analytics-dashboard ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
-}
-
-/* ===== ANIMATIONS ===== */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
+@media (max-width: 1200px) {
+  :root {
+    --border-radius: 14px;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  
+  .chart-container {
+    min-height: 420px;
+    padding: 20px;
+  }
+  
+  .chart-container:has(.recharts-bar-chart),
+  .chart-container:has(.recharts-pie-chart) {
+    min-height: 440px !important;
+    height: 440px !important;
+  }
+  
+  .chart-container:has(.recharts-radar-chart) {
+    min-height: 480px !important;
+    height: 480px !important;
+  }
+  
+  .chart-container h6 {
+    font-size: 1.3rem !important;
+  }
+  
+  .stat-card h4 {
+    font-size: 2.25rem;
   }
 }
 
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes gradientShift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-
-@keyframes spinPulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.1); opacity: 0.8; }
-}
-
-@keyframes tooltipFadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(-5px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-/* ===== TAB PANEL ===== */
-.MuiTabPanel-root {
-  animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--glass-border);
-  border-top: none;
-  border-radius: 0 0 var(--border-radius) var(--border-radius);
-  box-shadow: var(--shadow-md);
-}
-
-/* ===== RESPONSIVE DESIGN ===== */
 @media (max-width: 768px) {
   :root {
     --border-radius: 12px;
   }
 
   .analytics-dashboard {
-    padding: 12px !important;
+    padding: 16px !important;
   }
   
   .dashboard-header {
-    padding: 20px !important;
-    border-radius: 12px;
+    padding: 24px !important;
   }
   
-  .stat-card {
-    margin-bottom: 12px;
+  .dashboard-header h4 {
+    font-size: 1.75rem;
   }
   
   .chart-container {
-    margin-bottom: 12px;
+    min-height: 380px;
+    padding: 16px;
+  }
+  
+  .chart-container:has(.recharts-bar-chart),
+  .chart-container:has(.recharts-pie-chart) {
+    min-height: 400px !important;
+    height: 400px !important;
+  }
+  
+  .chart-container:has(.recharts-radar-chart) {
+    min-height: 420px !important;
+    height: 420px !important;
+  }
+  
+  .chart-container h6 {
+    font-size: 1.2rem !important;
+    margin-bottom: 20px;
+  }
+  
+  .stat-card h4 {
+    font-size: 2rem;
   }
   
   .analytics-tabs .MuiTab-root {
-    min-height: 56px;
-    font-size: 0.85rem;
-    padding: 8px 12px;
+    min-height: 60px;
+    font-size: 0.9rem;
+    padding: 12px 16px;
   }
   
-  .analytics-tabs {
-    border-radius: 12px 12px 0 0;
+  /* Improve chart visibility on mobile */
+  .recharts-wrapper {
+    transform: scale(0.98);
+    transform-origin: center;
   }
   
-  .filter-section {
-    padding: 16px;
+  .recharts-cartesian-axis-tick-value {
+    font-size: 12px !important;
+  }
+  
+  .recharts-text {
+    font-size: 12px !important;
   }
 }
 
@@ -590,36 +654,198 @@
     font-size: 1.5rem;
   }
   
+  .chart-container {
+    min-height: 350px;
+    padding: 12px;
+  }
+  
+  .chart-container:has(.recharts-bar-chart),
+  .chart-container:has(.recharts-pie-chart) {
+    min-height: 380px !important;
+    height: 380px !important;
+  }
+  
+  .chart-container h6 {
+    font-size: 1.1rem !important;
+    margin-bottom: 16px;
+  }
+  
   .stat-card h4 {
     font-size: 1.75rem;
   }
   
-  .dashboard-button {
-    padding: 8px 16px;
-    font-size: 0.875rem;
+  .analytics-tabs .MuiTab-root {
+    min-height: 56px;
+    font-size: 0.85rem;
+    padding: 10px 12px;
+  }
+  
+  .recharts-cartesian-axis-tick-value {
+    font-size: 11px !important;
+  }
+  
+  .recharts-text {
+    font-size: 11px !important;
   }
 }
 
-/* ===== PRINT STYLES ===== */
-@media print {
+/* ===== GRID LAYOUT ENHANCEMENTS ===== */
+
+/* Ensure charts in grid take full available space */
+.MuiGrid-item .chart-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.MuiGrid-container .MuiGrid-item {
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* Important for flexbox sizing */
+}
+
+.MuiGrid-container .MuiGrid-item > .chart-container {
+  flex: 1;
+  min-height: 0; /* Important for flexbox sizing */
+}
+
+/* ResponsiveContainer should take full available space */
+.recharts-responsive-container {
+  width: 100% !important;
+  height: 100% !important;
+  flex: 1 !important;
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes gradientFlow {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes floatBackground {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(1deg); }
+}
+
+@keyframes tooltipSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes chartScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.chart-container {
+  animation: chartScaleIn 0.6s ease-out backwards;
+}
+
+/* ===== DARK MODE SUPPORT ===== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --glass-bg: rgba(30, 30, 40, 0.95);
+    --glass-border: rgba(255, 255, 255, 0.1);
+  }
+  
   .analytics-dashboard {
-    background: white;
+    background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+  }
+  
+  .chart-container h6,
+  .stat-card .MuiTypography-body2 {
+    color: #e2e8f0;
+  }
+  
+  .recharts-text {
+    fill: #e2e8f0 !important;
+  }
+  
+  .recharts-cartesian-axis-tick-value {
+    fill: #94a3b8 !important;
+  }
+  
+  .recharts-legend-item-text {
+    color: #e2e8f0 !important;
+  }
+  
+  .recharts-cartesian-grid-horizontal line,
+  .recharts-cartesian-grid-vertical line {
+    stroke: #334155 !important;
+  }
+  
+  .dashboard-header .MuiTypography-body1 {
+    color: #cbd5e1;
+  }
+}
+
+/* ===== HIGH CONTRAST MODE FOR BETTER READABILITY ===== */
+@media (prefers-contrast: high) {
+  .recharts-text {
+    fill: #000000 !important;
+    font-weight: 700 !important;
+  }
+  
+  .recharts-cartesian-axis-tick-value {
+    fill: #000000 !important;
+    font-weight: 700 !important;
+  }
+  
+  .recharts-legend-item-text {
+    color: #000000 !important;
+    font-weight: 700 !important;
   }
   
   .stat-card,
   .chart-container,
   .analytics-tabs {
-    box-shadow: none;
-    border: 1px solid #e0e0e0;
+    border: 2px solid currentColor;
+    background: white;
   }
   
-  .dashboard-button,
-  .filter-section {
-    display: none;
+  .chart-container::before,
+  .stat-card::before,
+  .dashboard-header::before {
+    background: currentColor;
   }
 }
 
-/* ===== ACCESSIBILITY ===== */
+/* ===== ACCESSIBILITY ENHANCEMENTS ===== */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -630,15 +856,111 @@
   }
 }
 
-/* High contrast mode support */
-@media (prefers-contrast: high) {
+/* ===== SCROLLBAR STYLING ===== */
+.analytics-dashboard ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.analytics-dashboard ::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+}
+
+.analytics-dashboard ::-webkit-scrollbar-thumb {
+  background: var(--primary-gradient);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.analytics-dashboard ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+}
+
+/* ===== PRINT STYLES ===== */
+@media print {
+  .analytics-dashboard {
+    background: white !important;
+  }
+  
   .stat-card,
   .chart-container,
   .analytics-tabs {
-    border: 2px solid currentColor;
+    box-shadow: none !important;
+    border: 2px solid #e0e0e0 !important;
+    background: white !important;
+    break-inside: avoid;
   }
   
-  .dashboard-button {
-    border: 2px solid currentColor;
+  .dashboard-button,
+  .filter-section {
+    display: none !important;
   }
+  
+  .chart-container {
+    min-height: 400px !important;
+    height: 400px !important;
+  }
+}
+
+/* ===== FALLBACK STYLES FOR GRAPH VISIBILITY ===== */
+/* Ensure charts are always visible */
+.recharts-surface {
+  background: transparent !important;
+}
+
+.recharts-default-legend {
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(10px) !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  margin-top: 10px !important;
+}
+
+/* Fix for potential z-index issues */
+.recharts-tooltip-wrapper {
+  z-index: 9999 !important;
+}
+
+/* Ensure proper contrast */
+.recharts-label {
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Custom class for very large charts */
+.extra-large-chart {
+  min-height: 600px !important;
+  height: 600px !important;
+  padding: 32px !important;
+}
+
+.extra-large-chart h6 {
+  font-size: 1.5rem !important;
+  margin-bottom: 32px;
+}
+
+/* Loading states for charts */
+.chart-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: var(--border-radius);
+}
+
+/* Error states for charts */
+.chart-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  background: rgba(254, 226, 226, 0.8);
+  border-radius: var(--border-radius);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  color: #dc2626;
+  font-weight: 600;
+  text-align: center;
+  padding: 20px;
 }

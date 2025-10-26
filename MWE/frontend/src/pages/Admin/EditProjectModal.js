@@ -8,6 +8,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import SaveIcon from '@mui/icons-material/Save';
+import { getAuthHeaders } from '../../components/authUtils';
 
 const LANGUAGE_OPTIONS = [
     'Bangla', 'Maithili', 'Konkani',
@@ -53,7 +54,9 @@ export default function EditProjectModal({
     const fetchAvailableUsers = async () => {
         setIsLoading(true);
         try {
-            const response = await fetch('http://127.0.0.1:5001/api/users-list');
+            const response = await fetch('http://127.0.0.1:5001/api/users-list', {
+                headers: getAuthHeaders()
+            });
             if (response.ok) {
                 const users = await response.json();
                 setAvailableUsers(users);
@@ -67,7 +70,9 @@ export default function EditProjectModal({
 
     const fetchCurrentAssignedUsers = async (projectId) => {
         try {
-            const response = await fetch(`http://127.0.0.1:5001/api/projects/${projectId}/users_and_progress`);
+            const response = await fetch(`http://127.0.0.1:5001/api/projects/${projectId}/users_and_progress`, {
+                headers: getAuthHeaders()
+            });
             if (response.ok) {
                 const data = await response.json();
                 setCurrentAssignedUsers(data.users.map(user => user.username));
@@ -121,9 +126,7 @@ export default function EditProjectModal({
 
             const response = await fetch(`http://127.0.0.1:5001/api/projects/${project.id}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(updateData),
             });
 

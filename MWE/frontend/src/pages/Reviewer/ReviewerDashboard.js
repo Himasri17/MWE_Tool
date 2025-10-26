@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate,  } from 'react-router-dom';
 
 import {
     Container, Box, Typography, Card, CardContent, Grid, CircularProgress, Alert, Button, Chip,
@@ -11,22 +11,20 @@ import {
 } from '@mui/material';
 
 import RateReviewIcon from '@mui/icons-material/RateReview';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import PeopleIcon from '@mui/icons-material/People';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 
 
 
 const getReviewerUsername = () => { 
-    const reviewerEmail = localStorage.getItem('reviewerUsername') || 'reviewer@example.com';
+    // The login endpoint stores it as 'username' in localStorage
+    const reviewerEmail = localStorage.getItem('username') || 'reviewer@example.com';
     
-    // Split the email at the '@' symbol and return the first part (the username)
+    console.log('Reviewer email from localStorage:', reviewerEmail);
+    
+    // If you want just the username part (without @domain.com)
     const parts = reviewerEmail.split('@');
-    
-    // Return the username part (or the full email if no '@' was found)
     return parts[0] || reviewerEmail;
 }
-
 
 export default function ReviewerDashboard() {
     const navigate = useNavigate();
@@ -155,8 +153,7 @@ export default function ReviewerDashboard() {
                     {projects.map((project) => {
                         const doneCount = project.annotated_count || 0;
                         const totalCount = project.total_sentences || 0;
-                        const readyCount = project.usersToReview.reduce((sum, u) => sum + u.completed, 0);
-
+                     
                         return (
                             <Grid item xs={12} md={6} key={project.id}>
                                 <Card elevation={4} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>

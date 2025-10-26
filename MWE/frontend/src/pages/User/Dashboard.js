@@ -6,13 +6,13 @@ import {
     DialogContentText, DialogTitle, Chip, CircularProgress, 
     Grid, LinearProgress, Card, CardContent ,FormControl, InputLabel, Select, MenuItem 
 } from "@mui/material";
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import FeedbackIcon from '@mui/icons-material/Feedback'; 
+import {  getToken, removeToken } from '../../components/authUtils'; // Import auth utilities
+
+
 
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import FeedbackDialog from './FeedbackDialog'; 
-
-
 
 export default function Dashboard() {
     const { username } = useParams();
@@ -20,11 +20,9 @@ export default function Dashboard() {
 
     // --- State Management ---
     const [userData, setUserData] = useState(null);
-
     const [projectTasks, setProjectTasks] = useState([]);
-    const [allSentences, setAllSentences] = useState([]);        // Stores all sentences for the currently selected project/group
-    const [visibleSentences, setVisibleSentences] = useState([]); // The list currently visible in the UI (post-filter)
-    
+    const [allSentences, setAllSentences] = useState([]);
+    const [visibleSentences, setVisibleSentences] = useState([]);
     const [tags, setTags] = useState([]);
     const [selectedSentence, setSelectedSentence] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -37,86 +35,147 @@ export default function Dashboard() {
     const [file, setFile] = useState(null);
     const [bulkTag, setBulkTag] = useState('');
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+    const [tagRecommendations, setTagRecommendations] = useState([]);
+    const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
+    const [showRecommendations, setShowRecommendations] = useState(false);
+    const [statsDialogOpen, setStatsDialogOpen] = useState(false);
+    const [tagStats, setTagStats] = useState(null);
+    const [isLoadingStats, setIsLoadingStats] = useState(false);
     
+    // FIXED: Use state for currentSentenceTags instead of derived value
+    const [currentSentenceTags, setCurrentSentenceTags] = useState([]);
+
     // --- SEARCH & TAG MATCH STATES ---
     const [searchTerm, setSearchTerm] = useState('');
-    const [matchedTag, setMatchedTag] = useState(null); // Stores the tag object if the search term is an an exact tag match
+    const [matchedTag, setMatchedTag] = useState(null);
     const PREDEFINED_TAGS = [
-    "Noun Compound",
-    "Reduplicated", 
-    "Echo",
-    "Opaque",
-    "Opaque-Idiom"
+        "Noun Compound",
+        "Reduplicated", 
+        "Echo",
+        "Opaque",
+        "Opaque-Idiom"
     ];
-    // -------------------------------------
 
     // --- PROJECT STATES ---
     const [selectedProject, setSelectedProject] = useState(null); 
     const [projectName, setProjectName] = useState(""); 
-    // --------------------------
 
     // --- Ref for scroll control ---
     const listRef = useRef(null);
     const isInitialLoad = useRef(true);
 
-    // --- API Data Fetching ---
+    useEffect(() => {
+        const token = getToken();
+        if (!token) {
+            navigate("/");
+            return;
+        }
+    }, [navigate]);
+
+    const fetchWithAuth = async (url, options = {}) => {
+        const token = getToken();
+        if (!token) {
+            navigate("/");
+            return null;
+        }
+
+        const response = await fetch(url, {
+            ...options,
+            headers: {
+                ...options.headers,
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.status === 401) {
+            // Token expired or invalid
+            removeToken();
+            navigate("/");
+            return null;
+        }
+
+        return response;
+    };
+
     const fetchTags = useCallback(async () => {
         try {
-            const res = await fetch(`http://127.0.0.1:5001/tags/${username}`);
+            console.log("DEBUG: Starting to fetch tags for user:", username);
+            const res = await fetchWithAuth(`http://127.0.0.1:5001/tags/${username}`);
+            if (!res) return; // Authentication failed
+            
             if (!res.ok) throw new Error("Failed to fetch tags");
-            setTags(await res.json());
-        } catch (err) { console.error(err); }
+            
+            const tagsData = await res.json();
+            console.log("DEBUG: Tags fetched from server:", tagsData);
+            console.log("DEBUG: Number of tags received:", tagsData.length);
+            
+            setTags(tagsData);
+        } catch (err) { 
+            console.error("Error fetching tags:", err); 
+        }
     }, [username]);
 
-    // CORE LOADER: Fetches all data and initializes the view
-    const loadAllUserTasks = useCallback(async (setLoading = true) => {
-    if (setLoading) setIsLoading(true);
-    try {
-        const res = await fetch(`http://127.0.0.1:5001/sentences/${username}`);
-        if (!res.ok) throw new Error("Failed to fetch all user tasks.");
-        const data = await res.json();
-        
-        const projects = data.project_tasks || [];
-        
-        setProjectTasks(projects);
-        
-        // 2. Determine initial view (Project is prioritized)
-        let initialProject = null;
-        if (projects.length > 0) {
-            // A. Try to find the first project with REMAINING tasks
-            initialProject = projects.find(p => p.completed < p.total);
-            
-            // B. CRITICAL FIX: If no incomplete project is found, select the very first one (projects[0]).
-            if (!initialProject) {
-                initialProject = projects[0]; 
-            }
-        }
-
-        // 3. Set initial visibility based on selection
-        if (initialProject) {
-            setSelectedProject(initialProject);
-            setProjectName(initialProject.project_name);
-            setAllSentences(initialProject.sentences || []); 
-            // setVisibleSentences is handled by the filtering useEffect
+    useEffect(() => {
+        if (selectedSentence && tags.length > 0) {
+            const filteredTags = tags.filter(tag => {
+                const matches = tag.source_sentence_id === selectedSentence._id;
+                console.log(`Filtering tag ${tag._id} for sentence ${selectedSentence._id}: ${matches}`);
+                return matches;
+            });
+            console.log("Setting currentSentenceTags to:", filteredTags);
+            setCurrentSentenceTags(filteredTags);
         } else {
-            setSelectedProject(null);
-            setProjectName(projects.length > 0 ? "No Unfinished Tasks Selected" : "No Assigned Projects");
-            setAllSentences([]); 
-            setVisibleSentences([]); 
+            console.log("Clearing currentSentenceTags");
+            setCurrentSentenceTags([]);
         }
-        
-        setSelectedSentence(null); 
-        setSearchTerm(''); 
-        
-    } catch (err) { 
-        console.error("Error loading user tasks:", err); 
-        setProjectTasks([]);
-        setAllSentences([]);
-        setVisibleSentences([]);
-    } finally {
-        if (setLoading) setIsLoading(false);
-    }
-}, [username]);
+    }, [selectedSentence, tags]);
+
+    const loadAllUserTasks = useCallback(async (setLoading = true) => {
+        if (setLoading) setIsLoading(true);
+        try {
+            const res = await fetchWithAuth(`http://127.0.0.1:5001/sentences/${username}`);
+            if (!res) return; // Authentication failed
+            
+            if (!res.ok) throw new Error("Failed to fetch all user tasks.");
+            const data = await res.json();
+            
+            const projects = data.project_tasks || [];
+            setProjectTasks(projects);
+            
+            // Determine initial view (Project is prioritized)
+            let initialProject = null;
+            if (projects.length > 0) {
+                initialProject = projects.find(p => p.completed < p.total);
+                if (!initialProject) {
+                    initialProject = projects[0]; 
+                }
+            }
+
+            // Set initial visibility based on selection
+            if (initialProject) {
+                setSelectedProject(initialProject);
+                setProjectName(initialProject.project_name);
+                setAllSentences(initialProject.sentences || []);
+            } else {
+                setSelectedProject(null);
+                setProjectName(projects.length > 0 ? "No Unfinished Tasks Selected" : "No Assigned Projects");
+                setAllSentences([]); 
+                setVisibleSentences([]); 
+            }
+            
+            setSelectedSentence(null); 
+            setSearchTerm(''); 
+            
+        } catch (err) { 
+            console.error("Error loading user tasks:", err); 
+            setProjectTasks([]);
+            setAllSentences([]);
+            setVisibleSentences([]);
+        } finally {
+            if (setLoading) setIsLoading(false);
+        }
+    }, [username]);
+
 
     useEffect(() => {
         const loadData = async () => {
@@ -127,9 +186,16 @@ export default function Dashboard() {
     }, [fetchTags, loadAllUserTasks]);
 
     useEffect(() => {
+        // Close recommendations when selecting a different sentence
+        if (!selectedSentence) {
+            setShowRecommendations(false);
+            setTagRecommendations([]);
+        }
+    }, [selectedSentence]);
+
+    useEffect(() => {
         const fetchUserData = async () => {
             try {
-                // You might need to create this endpoint in your backend
                 const res = await fetch(`http://127.0.0.1:5001/api/user/${username}`);
                 if (res.ok) {
                     const data = await res.json();
@@ -144,7 +210,6 @@ export default function Dashboard() {
             fetchUserData();
         }
     }, [username]);
-
 
     // --- UPDATED: Search Filtering Effect (Handles Sentence and Tag Match) ---
     useEffect(() => {
@@ -197,30 +262,89 @@ export default function Dashboard() {
         isInitialLoad.current = false;
     }, [isLoading, visibleSentences, searchTerm]);
     
-    // --- Auto-Tag Detection (Works on selected sentence) ---
+    // Update the auto-tag detection to work with currentSentenceTags
     useEffect(() => {
-        if (!selectedSentence || !tags.length) {
+        if (!selectedSentence || currentSentenceTags.length === 0) {
             setAutoTags([]);
             return;
         }
-        const uniqueTagTexts = [...new Set(tags.map(t => t.text.toLowerCase()))];
+        
+        const uniqueTagTexts = [...new Set(currentSentenceTags.map(t => t.text.toLowerCase()))];
         const foundTags = [];
+        
         uniqueTagTexts.forEach(tagText => {
             const regex = new RegExp(`\\b${tagText}\\b`, 'i');
             if (regex.test(selectedSentence.textContent)) {
-                const originalTag = tags.find(t => t.text.toLowerCase() === tagText);
+                const originalTag = currentSentenceTags.find(t => t.text.toLowerCase() === tagText);
                 if (originalTag) {
                     foundTags.push({ text: originalTag.text, tag: originalTag.tag });
                 }
             }
         });
+        
         setAutoTags(foundTags);
-    }, [selectedSentence, tags]);
+    }, [selectedSentence, currentSentenceTags]);
+
+    const fetchTagRecommendations = async (text) => {
+        if (!text || text.trim().length < 2) {
+            setTagRecommendations([]);
+            return;
+        }
+
+        setIsLoadingRecommendations(true);
+        try {
+            const response = await fetchWithAuth('http://127.0.0.1:5001/api/recommend-tags/text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text })
+            });
+
+            if (!response) return; // Authentication failed
+
+            if (response.ok) {
+                const data = await response.json();
+                setTagRecommendations(data.recommendations || []);
+                setShowRecommendations(true);
+            } else {
+                console.error('Failed to fetch recommendations');
+                setTagRecommendations([]);
+            }
+        } catch (error) {
+            console.error('Error fetching recommendations:', error);
+            setTagRecommendations([]);
+        } finally {
+            setIsLoadingRecommendations(false);
+        }
+    };
+
 
     // --- Event Handlers ---
     
     const handleSearchChange = (event) => {
         setSearchTerm(event.target.value);
+    };
+
+     const handleOpenStats = async () => {
+        setIsLoadingStats(true);
+        setStatsDialogOpen(true);
+        
+        try {
+            const response = await fetchWithAuth('http://127.0.0.1:5001/api/recommendation-stats');
+            if (!response) return; // Authentication failed
+            
+            if (response.ok) {
+                const stats = await response.json();
+                setTagStats(stats);
+            } else {
+                console.error('Failed to fetch tag stats');
+                setTagStats(null);
+            }
+        } catch (error) {
+            console.error('Error fetching tag stats:', error);
+            setTagStats(null);
+        } finally {
+            setIsLoadingStats(false);
+        }
     };
 
     const handleSelectProject = (project) => {
@@ -246,35 +370,45 @@ export default function Dashboard() {
         }
     };
 
-    
-
     const handleSelectionEvent = (sentence) => {
         const highlightedText = window.getSelection().toString().trim();
         setSelectedSentence(sentence);
         setEditingTag({ isActive: false, _id: null, text: '', tag: '' });
 
         if (highlightedText.length > 0 && !editingSentence.isActive) {
-            let suggestion = "Noun Compound"; // Default to first option
+            let suggestion = "Noun Compound";
             const lowerCaseText = highlightedText.toLowerCase();
             const existingTag = tags.find(t => t.text.toLowerCase() === lowerCaseText);
 
             if (existingTag) {
-            suggestion = existingTag.tag;
-            } else {
-            // Use your custom logic here if needed, or keep the default
-            // For now, we'll just use "Noun Compound" as default
+                suggestion = existingTag.tag;
             }
+            
             setNewSelection({ isActive: true, text: highlightedText, tag: suggestion });
+            
+            // Fetch recommendations for the highlighted text
+            fetchTagRecommendations(highlightedText);
         } else {
             setNewSelection({ isActive: false, text: '', tag: '' });
+            setTagRecommendations([]);
+            setShowRecommendations(false);
         }
-        };
+    };
+
+    const handleSelectRecommendation = (recommendation) => {
+        setNewSelection(prev => ({
+            ...prev,
+            tag: recommendation.recommended_tag
+        }));
+        setShowRecommendations(false);
+    };
 
     const handleSaveNewTag = async () => {
         if (!selectedSentence || !newSelection.text.trim() || !newSelection.tag.trim()) {
             return alert("Please provide both text and a tag label.");
         }
-        await fetch(`http://127.0.0.1:5001/tags`, {
+        
+        const response = await fetchWithAuth(`http://127.0.0.1:5001/tags`, {
             method: 'POST',
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -284,22 +418,34 @@ export default function Dashboard() {
                 sentenceId: selectedSentence._id
             }),
         });
+        
+        if (!response) return; // Authentication failed
+        
         await fetchTags();
         setNewSelection({ isActive: false, text: '', tag: '' });
     };
+
+    const handleRemoveTag = async (tagId) => {
+        if (!selectedSentence) return;
+        
+        const response = await fetchWithAuth(`http://127.0.0.1:5001/sentences/${selectedSentence._id}/tags/${tagId}`, { 
+            method: 'DELETE' 
+        });
+        
+        if (!response) return; // Authentication failed
+        
+        await fetchTags();
+    };
+
 
     const handleStartEditTag = (tag) => {
         setEditingTag({ isActive: true, _id: tag._id, text: tag.text, tag: tag.tag });
         setNewSelection({ isActive: false, text: '', tag: '' });
     };
 
-    const handleRemoveTag = async (tagId) => {
-        if (!selectedSentence) return;
-        await fetch(`http://127.0.0.1:5001/sentences/${selectedSentence._id}/tags/${tagId}`, { method: 'DELETE' });
-        await fetchTags();
-    };
+    
 
-    const handleUpdateTag = async () => {
+     const handleUpdateTag = async () => {
         if (!editingTag._id) return;
 
         // Local update for snappier UI
@@ -312,8 +458,7 @@ export default function Dashboard() {
         );
 
         try {
-            // Re-use the POST endpoint for updating the tag content (it works as an upsert/update).
-            await fetch(`http://127.0.0.1:5001/tags`, {
+            const response = await fetchWithAuth(`http://127.0.0.1:5001/tags`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -323,6 +468,9 @@ export default function Dashboard() {
                     sentenceId: selectedSentence._id 
                 })
             });
+            
+            if (!response) return; // Authentication failed
+            
         } catch (err) {
             console.error("Error updating tag:", err);
         }
@@ -331,58 +479,62 @@ export default function Dashboard() {
     };
 
     const handleStatusChange = async (isAnnotated) => {
-    if (!selectedSentence) return;
+        if (!selectedSentence) return;
 
-    // Optimistic UI Update (keep this)
-    const updatedAllSentences = allSentences.map(s =>
-        s._id === selectedSentence._id ? { ...s, is_annotated: isAnnotated } : s
-    );
-    setAllSentences(updatedAllSentences);
-    setSelectedSentence({ ...selectedSentence, is_annotated: isAnnotated });
+        // Optimistic UI Update (keep this)
+        const updatedAllSentences = allSentences.map(s =>
+            s._id === selectedSentence._id ? { ...s, is_annotated: isAnnotated } : s
+        );
+        setAllSentences(updatedAllSentences);
+        setSelectedSentence({ ...selectedSentence, is_annotated: isAnnotated });
 
-    try {
-        const response = await fetch(`http://127.0.0.1:5001/sentences/${selectedSentence._id}/status`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ is_annotated: isAnnotated, username }),
-        });
+        try {
+            const response = await fetchWithAuth(`http://127.0.0.1:5001/sentences/${selectedSentence._id}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_annotated: isAnnotated, username }),
+            });
 
-        if (!response.ok) {
-            // Log status and attempt to read JSON error body for better diagnosis
-            const errorBody = await response.json().catch(() => ({ error: 'No JSON body available' }));
+            if (!response) return; // Authentication failed
+
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => ({ error: 'No JSON body available' }));
+                console.error(`Status Update Failed: ${response.status}`, errorBody);
+                throw new Error(errorBody.error || `Server Error (${response.status})`);
+            }
             
-            // CRITICAL DEBUG OUTPUT
-            console.error(`Status Update Failed: ${response.status}`, errorBody);
+            // Success: reload tasks to update metrics
+            await loadAllUserTasks(false); 
+
+        } catch (err) {
+            console.error("Final Error in Status Update:", err);
+            alert(`Failed to update status. Reason: ${err.message}. Check console.`);
             
-            throw new Error(errorBody.error || `Server Error (${response.status})`);
+            // Revert UI changes and fetch correct data state if update failed
+            await loadAllUserTasks(false);
         }
-        
-        // Success: reload tasks to update metrics
-        await loadAllUserTasks(false); 
-
-    } catch (err) {
-        console.error("Final Error in Status Update:", err);
-        alert(`Failed to update status. Reason: ${err.message}. Check console.`);
-        
-        // Revert UI changes and fetch correct data state if update failed
-        await loadAllUserTasks(false);
-    }
-};
+    };
 
     const handleLogout = async () => {
-        await fetch('http://127.0.0.1:5001/logout', {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username }),
-        });
-        isInitialLoad.current = true;
-        navigate("/");
-    };
+        try {
+            await fetchWithAuth('http://127.0.0.1:5001/logout', {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username }),
+            });
+        } catch (error) {
+            console.error("Logout API error:", error);
+        } finally {
+            // Always remove token and navigate to login
+            removeToken();
+            isInitialLoad.current = true;
+            navigate("/");
+        }
+    };;
 
     const handleFeedbackClose = (success = false) => {
         setIsFeedbackOpen(false);
         if (success) {
-            // Optionally show success notification here
             console.log("Feedback submission acknowledged.");
         }
     };
@@ -395,76 +547,83 @@ export default function Dashboard() {
     
     const getProjectCardColor = (isPending) => isPending ? '#ffcdd2' : '#c8e6c9';
 
-    const currentSentenceTags = selectedSentence 
-        ? tags.filter(tag => tag.source_sentence_id === selectedSentence._id && tag.username === username) 
-        : [];
-    
-        const renderHeaderBar = () => (
-            <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                py: 2, 
-                px: 4, 
-                bgcolor: '#e3f2fd', 
-                borderBottom: '1px solid #ddd' 
-            }}>
-                <Typography variant="h5" fontWeight="bold">
-                    MWE Annotator - {userData?.full_name || username || "User"}
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                    {/* User Guidelines Button */}
-                    <Button 
-                        variant="outlined" 
-                        onClick={() => window.open('/MWE Tool - User Guidelines.pdf', '_blank')}
-                        color="primary"
-                        sx={{ 
-                            color: 'black', 
-                            borderColor: 'black',
-                            '&:hover': {
-                                backgroundColor: '#e3f2fd',
-                                borderColor: 'black'
-                            }
-                        }}
-                    >
-                        SHOW USER GUIDELINES
-                    </Button>
-                    
-                    {/* Annotation Guidelines Button */}
-                    <Button 
-                        variant="outlined" 
-                        onClick={() => window.open('/MWE_Guidelines.pdf', '_blank')}
-                        color="primary"
-                        sx={{ 
-                            color: 'black', 
-                            borderColor: 'black',
-                            '&:hover': {
-                                backgroundColor: '#e3f2fd',
-                                borderColor: 'black'
-                            }
-                        }}
-                    >
-                        SHOW ANNOTATION GUIDELINES
-                    </Button>
-                    
-                    <Button 
-                        variant="outlined" 
-                        startIcon={<FeedbackIcon />}
-                        onClick={() => setIsFeedbackOpen(true)}
-                        color="primary"
-                    >
-                        Give Feedback
-                    </Button>
-                    <Button 
-                        variant="contained" 
-                        color="secondary" 
-                        onClick={handleLogout}
-                    >
-                        Logout
-                    </Button>
-                </Box>
+    const renderHeaderBar = () => (
+        <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            py: 2, 
+            px: 4, 
+            bgcolor: '#e3f2fd', 
+            borderBottom: '1px solid #ddd' 
+        }}>
+            <Typography variant="h5" fontWeight="bold">
+                MWE Annotator - {userData?.full_name || username || "User"}
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+                {/* User Guidelines Button */}
+                <Button 
+                    variant="outlined" 
+                    onClick={() => window.open('/MWE Tool - User Guidelines.pdf', '_blank')}
+                    color="primary"
+                    sx={{ 
+                        color: 'black', 
+                        borderColor: 'black',
+                        '&:hover': {
+                            backgroundColor: '#e3f2fd',
+                            borderColor: 'black'
+                        }
+                    }}
+                >
+                    SHOW USER GUIDELINES
+                </Button>
+                
+                {/* Annotation Guidelines Button */}
+                <Button 
+                    variant="outlined" 
+                    onClick={() => window.open('/MWE_Guidelines.pdf', '_blank')}
+                    color="primary"
+                    sx={{ 
+                        color: 'black', 
+                        borderColor: 'black',
+                        '&:hover': {
+                            backgroundColor: '#e3f2fd',
+                            borderColor: 'black'
+                        }
+                    }}
+                >
+                    SHOW ANNOTATION GUIDELINES
+                </Button>
+                
+                <Button 
+                    variant="outlined" 
+                    startIcon={<FeedbackIcon />}
+                    onClick={() => setIsFeedbackOpen(true)}
+                    color="primary"
+                >
+                    Give Feedback
+                </Button>
+                
+                {/* Updated Tag Stats Button */}
+                <Button 
+                    variant="outlined" 
+                    onClick={handleOpenStats}
+                    color="primary"
+                >
+                    Tag Stats
+                </Button>
+                
+                <Button 
+                    variant="contained" 
+                    color="secondary" 
+                    onClick={handleLogout}
+                >
+                    Logout
+                </Button>
             </Box>
-        );
+        </Box>
+    );
+
     // --- Render Logic ---
 
     return (
@@ -473,7 +632,6 @@ export default function Dashboard() {
             <Paper elevation={3} sx={{ p: 4, mt: 4, mb: 4, maxHeight: '90vh', overflow: 'hidden' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                     <Typography variant="h4" gutterBottom sx={{ mb: 0 }}>Welcome, {userData?.full_name || username || "User"}</Typography>
-                   
                 </Box>
                 
                 {/* --- Project Selector --- */}
@@ -535,7 +693,6 @@ export default function Dashboard() {
                         onChange={handleSearchChange}
                     />
                 </Box>
-                {/* ------------------------------ */}
     
                 <Box sx={{ display: 'flex', gap: 3, mt: 2, maxHeight: '60vh', overflow: 'hidden' }}>
                     <Box sx={{ width: '45%', display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
@@ -622,7 +779,6 @@ export default function Dashboard() {
                                 onChange={(e) => setEditingTag(prev => ({ ...prev, text: e.target.value }))} 
                                 />
                                 
-                                {/* REPLACE THIS TEXTFIELD WITH SELECT DROPDOWN */}
                                 <FormControl fullWidth sx={{ mb: 2 }}>
                                 <InputLabel>Tag Label</InputLabel>
                                 <Select
@@ -644,44 +800,90 @@ export default function Dashboard() {
                                 </Box>
                             </Box>
                             ) : newSelection.isActive ? (
-                                 <Box>
+                                <Box>
                                     <Typography variant="overline">CREATE NEW TAG</Typography>
                                     <TextField 
-                                    label="Selected Text" 
-                                    fullWidth 
-                                    variant="outlined" 
-                                    value={newSelection.text} 
-                                    onChange={(e) => setNewSelection(s => ({ ...s, text: e.target.value }))} 
-                                    sx={{ my: 2 }} 
+                                        label="Selected Text" 
+                                        fullWidth 
+                                        variant="outlined" 
+                                        value={newSelection.text} 
+                                        onChange={(e) => {
+                                            setNewSelection(s => ({ ...s, text: e.target.value }));
+                                            fetchTagRecommendations(e.target.value);
+                                        }} 
+                                        sx={{ my: 2 }} 
                                     />
                                     
-                                    {/* REPLACE THIS TEXTFIELD WITH SELECT DROPDOWN */}
+                                    {/* TAG RECOMMENDATIONS SECTION */}
+                                    {showRecommendations && tagRecommendations.length > 0 && (
+                                        <Box sx={{ mb: 2, p: 1, border: '1px solid #e0e0e0', borderRadius: 1, backgroundColor: '#f5f5f5' }}>
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                                Recommended Tags:
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                                {tagRecommendations.slice(0, 5).map((rec, index) => (
+                                                    <Chip
+                                                        key={index}
+                                                        label={`${rec.recommended_tag} (${Math.round(rec.confidence * 100)}%)`}
+                                                        onClick={() => handleSelectRecommendation(rec)}
+                                                        color="primary"
+                                                        variant={newSelection.tag === rec.recommended_tag ? "filled" : "outlined"}
+                                                        sx={{ cursor: 'pointer' }}
+                                                        title={`Phrase: "${rec.phrase}" - Used ${rec.occurrence_count} times`}
+                                                    />
+                                                ))}
+                                            </Box>
+                                        </Box>
+                                    )}
+                                    
+                                    {isLoadingRecommendations && (
+                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                            <CircularProgress size={20} sx={{ mr: 1 }} />
+                                            <Typography variant="body2" color="text.secondary">
+                                                Loading recommendations...
+                                            </Typography>
+                                        </Box>
+                                    )}
+                                    
                                     <FormControl fullWidth sx={{ mb: 2 }}>
-                                    <InputLabel>Tag Label</InputLabel>
-                                    <Select
-                                        value={newSelection.tag}
-                                        label="Tag Label"
-                                        onChange={(e) => setNewSelection(s => ({ ...s, tag: e.target.value }))}
-                                    >
-                                        {PREDEFINED_TAGS.map((tag) => (
-                                        <MenuItem key={tag} value={tag}>
-                                            {tag}
-                                        </MenuItem>
-                                        ))}
-                                    </Select>
+                                        <InputLabel>Tag Label</InputLabel>
+                                        <Select
+                                            value={newSelection.tag}
+                                            label="Tag Label"
+                                            onChange={(e) => setNewSelection(s => ({ ...s, tag: e.target.value }))}
+                                        >
+                                            {PREDEFINED_TAGS.map((tag) => (
+                                                <MenuItem key={tag} value={tag}>
+                                                    {tag}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
                                     </FormControl>
                                     
                                     <Box sx={{ display: 'flex', gap: 1 }}>
-                                    <Button onClick={handleSaveNewTag} variant="contained">Save Tag</Button>
-                                    <Button onClick={() => setNewSelection({ isActive: false, text: '', tag: '' })} variant="outlined">Cancel</Button>
+                                        <Button onClick={handleSaveNewTag} variant="contained">Save Tag</Button>
+                                        <Button onClick={() => {
+                                            setNewSelection({ isActive: false, text: '', tag: '' });
+                                            setShowRecommendations(false);
+                                            setTagRecommendations([]);
+                                        }} variant="outlined">Cancel</Button>
                                     </Box>
                                 </Box>
                             ) : (
                                 <Box>
                                     <Typography variant="overline">TAGS FOR THIS SENTENCE</Typography>
+
                                     <Box sx={{ my: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                                         {currentSentenceTags.map(tag => (
-                                            <Chip key={tag._id} label={`${tag.text} (${tag.tag})`} onDelete={() => handleRemoveTag(tag._id)} onClick={() => handleStartEditTag(tag)} color="primary" sx={{ cursor: "pointer" }} />
+                                            <Chip 
+                                                key={tag._id} 
+                                                label={`${tag.text} (${tag.tag})`} 
+                                                onDelete={() => handleRemoveTag(tag._id)} 
+                                                onClick={() => handleStartEditTag(tag)} 
+                                                color="primary" 
+                                                sx={{ cursor: "pointer" }}
+                                                title={`Annotated by: ${tag.username}`}
+                                            />
                                         ))}
                                         {autoTags.map((autoTag, index) => {
                                             const isAlreadyManual = currentSentenceTags.some(manualTag => manualTag.text === autoTag.text);
@@ -692,27 +894,25 @@ export default function Dashboard() {
                                             <Typography color="text.secondary">No tags yet. Highlight text to add one.</Typography>
                                         )}
                                     </Box>
+
                                     <Typography variant="overline" sx={{ mt: 3, display: 'block' }}>SENTENCE ACTIONS</Typography>
                                     <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                                        {/* Action buttons only visible when a sentence is selected */}
                                         <Button 
-    variant="contained" 
-    color="success" 
-    onClick={() => handleStatusChange(true)} 
-    // Button is disabled if the sentence is ALREADY annotated
-    disabled={selectedSentence.is_annotated}
->
-    Mark as Annotated
-</Button>
-<Button 
-    variant="outlined" 
-    color="secondary" 
-    onClick={() => handleStatusChange(false)} 
-    // Button is disabled if the sentence is NOT annotated
-    disabled={!selectedSentence.is_annotated}
->
-    Mark as Not Annotated
-</Button>
+                                            variant="contained" 
+                                            color="success" 
+                                            onClick={() => handleStatusChange(true)} 
+                                            disabled={selectedSentence.is_annotated}
+                                        >
+                                            Mark as Annotated
+                                        </Button>
+                                        <Button 
+                                            variant="outlined" 
+                                            color="secondary" 
+                                            onClick={() => handleStatusChange(false)} 
+                                            disabled={!selectedSentence.is_annotated}
+                                        >
+                                            Mark as Not Annotated
+                                        </Button>
                                     </Box>
                                 </Box>
                             )}
@@ -728,7 +928,6 @@ export default function Dashboard() {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setDeleteConfirmation({ isOpen: false, sentenceId: null })} color="secondary">Cancel</Button>
-                    
                 </DialogActions>
             </Dialog>
 
@@ -755,16 +954,193 @@ export default function Dashboard() {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setBulkUploadDialog(false)} color="secondary">Cancel</Button>
-                    
                 </DialogActions>
             </Dialog>
 
              <FeedbackDialog 
                 open={isFeedbackOpen} 
                 onClose={handleFeedbackClose} 
-                // Pass the user's email, falling back if userData hasn't loaded yet
                 userEmail={userData?.email || `${username}@placeholder.com`} 
             />
+
+            <Dialog 
+                open={statsDialogOpen} 
+                onClose={() => setStatsDialogOpen(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>
+                    <Typography variant="h6" component="div">
+                        Tag Database Statistics
+                    </Typography>
+                </DialogTitle>
+                <DialogContent>
+                    {isLoadingStats ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                            <CircularProgress />
+                        </Box>
+                    ) : tagStats ? (
+                        <Box>
+                            {/* Summary Section */}
+                            <Paper elevation={1} sx={{ p: 2, mb: 2, backgroundColor: '#f5f5f5' }}>
+                                <Typography variant="h6" gutterBottom>
+                                    Summary
+                                </Typography>
+                                <Grid container spacing={2}>
+                                    <Grid item xs={6}>
+                                        <Typography variant="body2">
+                                            <strong>Total Annotated Phrases:</strong> {tagStats.total_annotated_phrases}
+                                        </Typography>
+                                    </Grid>
+                                    <Grid item xs={6}>
+                                        <Typography variant="body2">
+                                            <strong>Tag Types:</strong> {tagStats.tag_statistics?.length || 0}
+                                        </Typography>
+                                    </Grid>
+                                </Grid>
+                            </Paper>
+
+                            {/* Tag Type Statistics */}
+                            <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+                                Tag Type Distribution
+                            </Typography>
+                            {tagStats.tag_statistics && tagStats.tag_statistics.length > 0 ? (
+                                <Box sx={{ mb: 3 }}>
+                                    {tagStats.tag_statistics.map((stat, index) => (
+                                        <Paper 
+                                            key={stat.tag_type || index} 
+                                            elevation={1} 
+                                            sx={{ p: 2, mb: 1 }}
+                                        >
+                                            <Grid container spacing={2} alignItems="center">
+                                                <Grid item xs={4}>
+                                                    <Typography variant="subtitle1" fontWeight="bold">
+                                                        {stat.tag_type || 'Unknown'}
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={3}>
+                                                    <Typography variant="body2">
+                                                        Total: {stat.total_annotations}
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={3}>
+                                                    <Typography variant="body2">
+                                                        Unique Phrases: {stat.unique_phrases_count}
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={2}>
+                                                    <Chip 
+                                                        label={stat.total_annotations} 
+                                                        color="primary" 
+                                                        size="small" 
+                                                    />
+                                                </Grid>
+                                            </Grid>
+                                            {stat.unique_phrases_count > 0 && (
+                                                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                                                    Sample phrases: {stat.unique_phrases?.slice(0, 3).join(', ')}
+                                                    {stat.unique_phrases_count > 3 && '...'}
+                                                </Typography>
+                                            )}
+                                        </Paper>
+                                    ))}
+                                </Box>
+                            ) : (
+                                <Typography color="text.secondary" sx={{ mb: 2 }}>
+                                    No tag statistics available.
+                                </Typography>
+                            )}
+
+                            {/* Most Common Phrases */}
+                            {tagStats.most_common_phrases && tagStats.most_common_phrases.length > 0 && (
+                                <>
+                                    <Typography variant="h6" gutterBottom>
+                                        Most Common Phrases
+                                    </Typography>
+                                    <Paper elevation={1} sx={{ p: 2 }}>
+                                        <Box sx={{ maxHeight: '200px', overflowY: 'auto' }}>
+                                            {tagStats.most_common_phrases.map((phrase, index) => (
+                                                <Box 
+                                                    key={index} 
+                                                    sx={{ 
+                                                        display: 'flex', 
+                                                        justifyContent: 'space-between', 
+                                                        alignItems: 'center',
+                                                        py: 1,
+                                                        borderBottom: index < tagStats.most_common_phrases.length - 1 ? '1px solid #e0e0e0' : 'none'
+                                                    }}
+                                                >
+                                                    <Typography variant="body2">
+                                                        "{phrase.phrase}"
+                                                    </Typography>
+                                                    <Chip 
+                                                        label={`${phrase.occurrence_count} times`} 
+                                                        size="small" 
+                                                        variant="outlined"
+                                                    />
+                                                </Box>
+                                            ))}
+                                        </Box>
+                                    </Paper>
+                                </>
+                            )}
+
+                            {/* Additional Statistics */}
+                            {tagStats.summary && (
+                                <Paper elevation={1} sx={{ p: 2, mt: 2, backgroundColor: '#e8f5e8' }}>
+                                    <Typography variant="subtitle2" gutterBottom>
+                                        Database Overview
+                                    </Typography>
+                                    <Grid container spacing={1}>
+                                        <Grid item xs={12}>
+                                            <Typography variant="body2">
+                                                <strong>Report Generated:</strong> {tagStats.summary.report_generated}
+                                            </Typography>
+                                        </Grid>
+                                        {tagStats.summary.total_sentences && (
+                                            <Grid item xs={6}>
+                                                <Typography variant="body2">
+                                                    <strong>Total Sentences:</strong> {tagStats.summary.total_sentences}
+                                                </Typography>
+                                            </Grid>
+                                        )}
+                                        {tagStats.summary.annotated_sentences && (
+                                            <Grid item xs={6}>
+                                                <Typography variant="body2">
+                                                    <strong>Annotated Sentences:</strong> {tagStats.summary.annotated_sentences}
+                                                </Typography>
+                                            </Grid>
+                                        )}
+                                        {tagStats.summary.annotation_rate && (
+                                            <Grid item xs={6}>
+                                                <Typography variant="body2">
+                                                    <strong>Annotation Rate:</strong> {tagStats.summary.annotation_rate.toFixed(1)}%
+                                                </Typography>
+                                            </Grid>
+                                        )}
+                                        {tagStats.summary.total_annotations && (
+                                            <Grid item xs={6}>
+                                                <Typography variant="body2">
+                                                    <strong>Total Annotations:</strong> {tagStats.summary.total_annotations}
+                                                </Typography>
+                                            </Grid>
+                                        )}
+                                    </Grid>
+                                </Paper>
+                            )}
+                        </Box>
+                    ) : (
+                        <Typography color="error" sx={{ p: 2, textAlign: 'center' }}>
+                            Failed to load tag statistics.
+                        </Typography>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setStatsDialogOpen(false)} color="primary">
+                        Close
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Container>
     );
 }
