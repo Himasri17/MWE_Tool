@@ -12,21 +12,16 @@ import {
 
 import RateReviewIcon from '@mui/icons-material/RateReview';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import {  getAuthHeaders, removeToken } from '../../components/authUtils'; 
-
+import {  getAuthHeaders, removeToken ,getToken} from '../../components/authUtils'; 
 
 
 
 const getReviewerUsername = () => { 
-    // The login endpoint stores it as 'username' in localStorage
+    // Return the full email as that's what's used as username in the backend
     const reviewerEmail = localStorage.getItem('username') || 'reviewer@example.com';
-    
     console.log('Reviewer email from localStorage:', reviewerEmail);
-    
-    // If you want just the username part (without @domain.com)
-    const parts = reviewerEmail.split('@');
-    return parts[0] || reviewerEmail;
-}
+    return reviewerEmail; // Return the full email, not just the username part
+}   
 
 export default function ReviewerDashboard() {
     const navigate = useNavigate();
@@ -110,27 +105,52 @@ export default function ReviewerDashboard() {
     
     const handleLogout = async () => {
         try {
-            // Try to call logout API
-            await fetch('http://127.0.0.1:5001/logout', {
-                method: "POST",
-                headers: { 
-                    "Content-Type": "application/json",
-                    ...getAuthHeaders()
-                },
-                body: JSON.stringify({ username: reviewerUsername }),
-            }).catch(error => {
-                console.warn("Logout API call failed:", error);
+            const token = getToken(); // Use getToken from authUtils
+            const reviewerEmail = localStorage.getItem('username');
+            
+            console.log('🔐 Logout Debug - Before API call:', { 
+                token: token ? 'Present' : 'Missing', 
+                reviewerEmail 
             });
+
+            if (token && reviewerEmail) {
+                // Call logout API to record the logout action
+                const response = await fetch('http://127.0.0.1:5001/logout', {
+                    method: "POST",
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ 
+                        username: reviewerEmail
+                    }),
+                });
+
+                console.log('🔐 Logout API Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('🔐 Logout API Success:', data);
+                } else {
+                    console.error('🔐 Logout API Failed:', await response.text());
+                }
+            } else {
+                console.warn('🔐 Missing token or username for logout');
+            }
         } catch (error) {
-            console.warn("Logout error:", error);
+            console.error('❌ Logout error:', error);
         } finally {
-            // Always cleanup and redirect
+            // Always cleanup and redirect - USE removeToken from authUtils
+            console.log('🧹 Cleaning up localStorage...');
             localStorage.removeItem('username');
-            removeToken(); // If using the same auth system
-            navigate("/");
+            removeToken(); // Use the function from authUtils
+            navigate("/login");
         }
     };
-
 
     // --- Loading, Error, Empty State Rendering ---
     if (loading) {

@@ -1,0 +1,446 @@
+[{
+  "_id": {
+    "$oid": "68fe35e8381325637674135b"
+  },
+  "username": "sashank97015@gmail.com",
+  "sessions": [
+    {
+      "id": "sashank97015@gmail.com_1761521146.572",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "27/10/2025, 10:25:46",
+      "logoutTimeIST": null,
+      "tasksDone": [
+        "Active session - no tasks recorded"
+      ]
+    },
+    {
+      "id": "sashank97015@gmail.com_1761518766.403",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "27/10/2025, 09:46:06",
+      "logoutTimeIST": "27/10/2025, 10:25:46",
+      "tasksDone": [
+        "Approved user account for: himasri17.p@gmail.com."
+      ]
+    },
+    {
+      "id": "sashank97015@gmail.com_1761518652.405",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "27/10/2025, 09:44:12",
+      "logoutTimeIST": "27/10/2025, 09:46:06",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashank97015@gmail.com_1761485655.275",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "27/10/2025, 00:34:15",
+      "logoutTimeIST": "27/10/2025, 09:44:12",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashank97015@gmail.com_1761482389.269",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "26/10/2025, 23:39:49",
+      "logoutTimeIST": "27/10/2025, 00:34:15",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashank97015@gmail.com_1761482279.818",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "26/10/2025, 23:37:59",
+      "logoutTimeIST": "26/10/2025, 23:39:49",
+      "tasksDone": [
+        "Assigned project \"p1\" to 1 users. Reflected existing pool progress."
+      ]
+    },
+    {
+      "id": "sashank97015@gmail.com_1761481286.313",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "26/10/2025, 23:21:26",
+      "logoutTimeIST": "26/10/2025, 23:37:59",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashank97015@gmail.com_1761480504.743",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "26/10/2025, 23:08:24",
+      "logoutTimeIST": "26/10/2025, 23:21:26",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashank97015@gmail.com_1761479858.888",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "26/10/2025, 22:57:38",
+      "logoutTimeIST": "26/10/2025, 23:08:24",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashank97015@gmail.com_1761479696.945",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "26/10/2025, 22:54:56",
+      "logoutTimeIST": "26/10/2025, 22:57:38",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashank97015@gmail.com_1761479561.183",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "26/10/2025, 22:52:41",
+      "logoutTimeIST": "26/10/2025, 22:54:56",
+      "tasksDone": [
+        "Assigned project \"p2\" to 1 users. Reflected existing pool progress."
+      ]
+    },
+    {
+      "id": "sashank97015@gmail.com_1761479101.072",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "26/10/2025, 22:45:01",
+      "logoutTimeIST": "26/10/2025, 22:52:41",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashank97015@gmail.com_1761478747.309",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "26/10/2025, 22:39:07",
+      "logoutTimeIST": "26/10/2025, 22:45:01",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashank97015@gmail.com_1761478164.164",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "26/10/2025, 22:29:24",
+      "logoutTimeIST": "26/10/2025, 22:39:07",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashank97015@gmail.com_1761477904.274",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "26/10/2025, 22:25:04",
+      "logoutTimeIST": "26/10/2025, 22:29:24",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashank97015@gmail.com_1761476852.916",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "26/10/2025, 22:07:32",
+      "logoutTimeIST": "26/10/2025, 22:25:04",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashank97015@gmail.com_1761474179.874",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "26/10/2025, 21:22:59",
+      "logoutTimeIST": "26/10/2025, 22:07:32",
+      "tasksDone": [
+        "Created project \"p2\" and assigned 11 sentences to tat.iiith@gmail.com"
+      ]
+    },
+    {
+      "id": "sashank97015@gmail.com_1761473796.133",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "26/10/2025, 21:16:36",
+      "logoutTimeIST": "26/10/2025, 21:22:59",
+      "tasksDone": [
+        "Approved user account for: tat.iiith@gmail.com.",
+        "Created project \"p1\" and assigned 10 sentences to tat.iiith@gmail.com"
+      ]
+    },
+    {
+      "id": "sashank97015@gmail.com_1761470696.902",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "26/10/2025, 20:24:56",
+      "logoutTimeIST": "26/10/2025, 21:16:36",
+      "tasksDone": [
+        "Approved user account for: sashanktatavolu@gmail.com."
+      ]
+    },
+    {
+      "id": "sashank97015@gmail.com_1761470631.976",
+      "username": "sashank97015@gmail.com",
+      "loginTimeIST": "26/10/2025, 20:23:51",
+      "logoutTimeIST": "26/10/2025, 20:24:56",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    }
+  ]
+},
+{
+  "_id": {
+    "$oid": "68fe35ed9024e1d90204aae5"
+  },
+  "username": "system",
+  "sessions": []
+},
+{
+  "_id": {
+    "$oid": "68fe362f381325637674135f"
+  },
+  "username": "sashanktatavolu@gmail.com",
+  "sessions": [
+    {
+      "id": "sashanktatavolu@gmail.com_1761521564.956",
+      "username": "sashanktatavolu@gmail.com",
+      "loginTimeIST": "27/10/2025, 10:32:44",
+      "logoutTimeIST": null,
+      "tasksDone": [
+        "Active session - no tasks recorded"
+      ]
+    },
+    {
+      "id": "sashanktatavolu@gmail.com_1761521035.637",
+      "username": "sashanktatavolu@gmail.com",
+      "loginTimeIST": "27/10/2025, 10:23:55",
+      "logoutTimeIST": "27/10/2025, 10:32:44",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashanktatavolu@gmail.com_1761520698.132",
+      "username": "sashanktatavolu@gmail.com",
+      "loginTimeIST": "27/10/2025, 10:18:18",
+      "logoutTimeIST": "27/10/2025, 10:23:55",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashanktatavolu@gmail.com_1761483015.069",
+      "username": "sashanktatavolu@gmail.com",
+      "loginTimeIST": "26/10/2025, 23:50:15",
+      "logoutTimeIST": "27/10/2025, 10:18:18",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashanktatavolu@gmail.com_1761482738.718",
+      "username": "sashanktatavolu@gmail.com",
+      "loginTimeIST": "26/10/2025, 23:45:38",
+      "logoutTimeIST": "26/10/2025, 23:50:15",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashanktatavolu@gmail.com_1761480845.045",
+      "username": "sashanktatavolu@gmail.com",
+      "loginTimeIST": "26/10/2025, 23:14:05",
+      "logoutTimeIST": "26/10/2025, 23:45:38",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashanktatavolu@gmail.com_1761480732.75",
+      "username": "sashanktatavolu@gmail.com",
+      "loginTimeIST": "26/10/2025, 23:12:12",
+      "logoutTimeIST": "26/10/2025, 23:14:05",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashanktatavolu@gmail.com_1761479839.97",
+      "username": "sashanktatavolu@gmail.com",
+      "loginTimeIST": "26/10/2025, 22:57:19",
+      "logoutTimeIST": "26/10/2025, 23:12:12",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashanktatavolu@gmail.com_1761479628.277",
+      "username": "sashanktatavolu@gmail.com",
+      "loginTimeIST": "26/10/2025, 22:53:48",
+      "logoutTimeIST": "26/10/2025, 22:57:19",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    },
+    {
+      "id": "sashanktatavolu@gmail.com_1761479487.325",
+      "username": "sashanktatavolu@gmail.com",
+      "loginTimeIST": "26/10/2025, 22:51:27",
+      "logoutTimeIST": "26/10/2025, 22:53:48",
+      "tasksDone": [
+        "Session ended with no tasks"
+      ]
+    }
+  ]
+},
+{
+  "_id": {
+    "$oid": "68fe42404e1e39004c89c47a"
+  },
+  "username": "tat.iiith@gmail.com",
+  "sessions": [
+    {
+      "id": "tat.iiith@gmail.com_1761521745.932",
+      "username": "tat.iiith@gmail.com",
+      "loginTimeIST": "27/10/2025, 10:35:45",
+      "logoutTimeIST": null,
+      "tasksDone": [
+        "Active session - no tasks recorded"
+      ]
+    },
+    {
+      "id": "tat.iiith@gmail.com_1761520750.724",
+      "username": "tat.iiith@gmail.com",
+      "loginTimeIST": "27/10/2025, 10:19:10",
+      "logoutTimeIST": "27/10/2025, 10:35:35",
+      "tasksDone": [
+        "Staged tag 'अच्छा है' as 'Noun Compound'",
+        "Marked sentence 'आज मौसम बहुत अच्छा है' as Annotated: Yes",
+        "Sentence status changed from 'Pending' to 'Approved'",
+        "Tag 'है' was approved by reviewer reviewer@example.com.",
+        "Removed tag 68fe5d8a29ef7e0953b27ee0 from sentence 'आज मौसम बहुत अच्छा है'",
+        "Marked sentence 'आज मौसम बहुत अच्छा है' as Annotated: No",
+        "Marked sentence 'वह बहुत मेहनती छात्रा है' as Annotated: No",
+        "Removed tag 68fe5d8d29ef7e0953b27ee1 from sentence 'माँ खाना बना रही हैं'",
+        "Marked sentence 'माँ खाना बना रही हैं' as Annotated: No",
+        "Removed tag 68fefb003438809e68ae0733 from sentence 'वह बहुत मेहनती छात्रा है'",
+        "Staged tag 'पहुँचना चाहिए' as 'Noun Compound'",
+        "Marked sentence 'हमें समय पर पहुँचना चाहिए' as Annotated: Yes",
+        "Marked sentence 'हमें समय पर पहुँचना चाहिए' as Annotated: No",
+        "Staged tag 'बहुत अच्छा है' as 'Noun Compound'",
+        "Sentence status changed from 'Approved' to 'Pending'",
+        "Tag 'बहुत अच्छा है' was rejected by reviewer reviewer@example.com."
+      ]
+    },
+    {
+      "id": "tat.iiith@gmail.com_1761520665.573",
+      "username": "tat.iiith@gmail.com",
+      "loginTimeIST": "27/10/2025, 10:17:45",
+      "logoutTimeIST": "27/10/2025, 10:18:05",
+      "tasksDone": []
+    },
+    {
+      "id": "tat.iiith@gmail.com_1761482373.918",
+      "username": "tat.iiith@gmail.com",
+      "loginTimeIST": "26/10/2025, 23:39:33",
+      "logoutTimeIST": "26/10/2025, 23:45:12",
+      "tasksDone": []
+    },
+    {
+      "id": "tat.iiith@gmail.com_1761480778.267",
+      "username": "tat.iiith@gmail.com",
+      "loginTimeIST": "26/10/2025, 23:12:58",
+      "logoutTimeIST": "26/10/2025, 23:13:53",
+      "tasksDone": [
+        "Marked sentence 'मैं स्कूल जा रही हूँ' as Annotated: No",
+        "Marked sentence 'तुम क्या कर रहे हो' as Annotated: No"
+      ]
+    },
+    {
+      "id": "tat.iiith@gmail.com_1761479594.944",
+      "username": "tat.iiith@gmail.com",
+      "loginTimeIST": "26/10/2025, 22:53:14",
+      "logoutTimeIST": "26/10/2025, 22:53:36",
+      "tasksDone": [
+        "Staged tag 'जा रही हूँ' as 'Echo'",
+        "Marked sentence 'मैं स्कूल जा रही हूँ' as Annotated: Yes",
+        "Staged tag 'क्या क' as 'Reduplicated'",
+        "Marked sentence 'तुम क्या कर रहे हो' as Annotated: Yes"
+      ]
+    },
+    {
+      "id": "tat.iiith@gmail.com_1761478150.621",
+      "username": "tat.iiith@gmail.com",
+      "loginTimeIST": "26/10/2025, 22:29:10",
+      "logoutTimeIST": "26/10/2025, 22:29:13",
+      "tasksDone": []
+    },
+    {
+      "id": "tat.iiith@gmail.com_1761474273.368",
+      "username": "tat.iiith@gmail.com",
+      "loginTimeIST": "26/10/2025, 21:24:33",
+      "logoutTimeIST": "26/10/2025, 22:07:15",
+      "tasksDone": [
+        "Staged tag 'जा रही हूँ' as 'Echo'",
+        "Marked sentence 'मैं स्कूल जा रही हूँ' as Annotated: Yes",
+        "Staged tag 'बना रही हैं' as 'Opaque-Idiom'",
+        "Marked sentence 'माँ खाना बना रही हैं' as Annotated: Yes"
+      ]
+    },
+    {
+      "id": "tat.iiith@gmail.com_1761473986.637",
+      "username": "tat.iiith@gmail.com",
+      "loginTimeIST": "26/10/2025, 21:19:46",
+      "logoutTimeIST": "26/10/2025, 21:22:39",
+      "tasksDone": []
+    },
+    {
+      "id": "tat.iiith@gmail.com_1761473842.91",
+      "username": "tat.iiith@gmail.com",
+      "loginTimeIST": "26/10/2025, 21:17:22",
+      "logoutTimeIST": "26/10/2025, 21:19:46",
+      "tasksDone": [
+        "Removed tag 68fe42774e1e39004c89c486 from sentence 'हमें समय पर पहुँचना चाहिए'",
+        "Marked sentence 'हमें समय पर पहुँचना चाहिए' as Annotated: No",
+        "Staged tag 'बहुत अच्छा' as 'Noun Compound'",
+        "Marked sentence 'आज मौसम बहुत अच्छा है' as Annotated: Yes",
+        "Staged tag 'है' as 'Reduplicated'",
+        "Marked sentence 'वह बहुत मेहनती छात्रा है' as Annotated: Yes"
+      ]
+    }
+  ]
+},
+{
+  "_id": {
+    "$oid": "68fe58a39024e1d90204bf61"
+  },
+  "username": "Sashank",
+  "sessions": []
+},
+{
+  "_id": {
+    "$oid": "68fe58a39024e1d90204bf66"
+  },
+  "username": "himasri17.p@gmail.com",
+  "sessions": []
+},
+{
+  "_id": {
+    "$oid": "68fe666a9024e1d90204ccc9"
+  },
+  "username": "reviewer",
+  "sessions": []
+},
+{
+  "_id": {
+    "$oid": "68fef1f13438809e68ae0730"
+  },
+  "username": "himasri17.p@gmail.com",
+  "sessions": []
+},
+{
+  "_id": {
+    "$oid": "68fef99b5fadcdf43288e98b"
+  },
+  "username": "reviewer@example.com",
+  "sessions": []
+}]

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
     Container, Box, Typography, TextField, Button, Paper, Link as MuiLink,
-    InputAdornment, IconButton, useTheme, Grid
+    InputAdornment, IconButton, useTheme, Grid, CircularProgress
 } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
@@ -19,7 +19,7 @@ export default function Login() {
     const [error, setError] = useState('');
     const [termsDialogOpen, setTermsDialogOpen] = useState(false);
     const [supportDialogOpen, setSupportDialogOpen] = useState(false);
-    const [isLoading, setIsLoading] = useState(false); // Add loading state
+    const [isLoading, setIsLoading] = useState(false); 
     const navigate = useNavigate();
     const theme = useTheme();
 
@@ -157,7 +157,7 @@ export default function Login() {
                             sx={{ mt: 1, mb: 2, py: 1.5, fontWeight: 'bold', letterSpacing: 1 }}
                             disabled={isLoading}
                         >
-                            {isLoading ? 'Signing In...' : 'Sign In'}
+                            {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Sign In'}
                         </Button>
                         
                         <Typography align="center" variant="body2" color="text.secondary">

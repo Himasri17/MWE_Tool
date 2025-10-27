@@ -64,6 +64,26 @@ export default function Navbar({
             
             {/* Right Side - Navigation Items */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}> 
+
+                 {/* Admin Dashboard Button */}
+                <Button 
+                    variant="outlined" 
+                    size="small" 
+                    startIcon={<Dashboard />}
+                    onClick={() => handleNavigate(`/admin/${currentUsername}`)}
+                    sx={{ 
+                        color: 'black', 
+                        borderColor: 'black',
+                        minWidth: 'auto', 
+                        p: '4px 8px',
+                        '&:hover': {
+                            backgroundColor: 'primary.main',
+                            color: 'white'
+                        }
+                    }}
+                >
+                    DASHBOARD
+                </Button>
                 
                 {/* Feedbacks Button */}
                 {showFeedbackBadge && onOpenFeedbackDialog && (
@@ -159,25 +179,6 @@ export default function Navbar({
                     </Button>
                 </Badge>
 
-                {/* Admin Dashboard Button */}
-                <Button 
-                    variant="outlined" 
-                    size="small" 
-                    startIcon={<Dashboard />}
-                    onClick={() => handleNavigate(`/admin/${currentUsername}`)}
-                    sx={{ 
-                        color: 'black', 
-                        borderColor: 'black',
-                        minWidth: 'auto', 
-                        p: '4px 8px',
-                        '&:hover': {
-                            backgroundColor: 'primary.main',
-                            color: 'white'
-                        }
-                    }}
-                >
-                    DASHBOARD
-                </Button>
                 
                 {/* User Info and Logout */}
                 <Typography variant="body1" sx={{ mx: 1 }}>

@@ -1,4 +1,3 @@
-// Update AdminApprovalList.js - Fix the refresh logic
 import React, { useState, useEffect} from 'react';
 import { useParams } from 'react-router-dom';
 import { 
@@ -9,6 +8,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import CancelIcon from '@mui/icons-material/Cancel';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import Navbar from '../../components/Navbar'; 
 import { getToken } from '../../components/authUtils'; // Import getToken function
 
@@ -173,8 +173,9 @@ export default function AdminApprovalList() {
                         variant="outlined" 
                         onClick={fetchPendingUsers}
                         disabled={isLoading}
+                        startIcon={isLoading ? <CircularProgress size={16} /> : <RefreshIcon />}
                     >
-                        Refresh
+                        {isLoading ? 'Refreshing...' : 'Refresh'}
                     </Button>
                 </Box>
                 
@@ -207,22 +208,22 @@ export default function AdminApprovalList() {
                                             <Button 
                                                 variant="contained" 
                                                 color="success"
-                                                startIcon={<CheckIcon />}
+                                                startIcon={actionInProgress ? <CircularProgress size={16} color="inherit" /> : <CheckIcon />}
                                                 onClick={() => handleApprove(user._id, user.email)}
                                                 disabled={actionInProgress}
                                                 size="small"
                                             >
-                                                Approve
+                                                {actionInProgress ? 'Approving...' : 'Approve'}
                                             </Button>
                                             <Button 
                                                 variant="outlined" 
                                                 color="error"
-                                                startIcon={<CancelIcon />}
+                                                startIcon={actionInProgress ? <CircularProgress size={16} color="inherit" /> : <CancelIcon />}
                                                 onClick={() => openRejectDialog(user)}
                                                 disabled={actionInProgress}
                                                 size="small"
                                             >
-                                                Reject
+                                                {actionInProgress ? 'Rejecting...' : 'Reject'}
                                             </Button>
                                         </Box>
                                     }
@@ -267,7 +268,7 @@ export default function AdminApprovalList() {
                 <DialogTitle>
                     <Box display="flex" alignItems="center" justifyContent="space-between">
                         <Typography variant="h6">Reject User Registration</Typography>
-                        <IconButton onClick={closeRejectDialog} size="small">
+                        <IconButton onClick={closeRejectDialog} size="small" disabled={actionInProgress}>
                             <CloseIcon />
                         </IconButton>
                     </Box>
@@ -287,6 +288,7 @@ export default function AdminApprovalList() {
                         value={rejectionReason}
                         onChange={(e) => setRejectionReason(e.target.value)}
                         variant="outlined"
+                        disabled={actionInProgress}
                     />
                 </DialogContent>
                 <DialogActions>
@@ -298,7 +300,7 @@ export default function AdminApprovalList() {
                         color="error" 
                         variant="contained"
                         disabled={actionInProgress}
-                        startIcon={<CancelIcon />}
+                        startIcon={actionInProgress ? <CircularProgress size={16} color="inherit" /> : <CancelIcon />}
                     >
                         {actionInProgress ? 'Rejecting...' : 'Reject User'}
                     </Button>

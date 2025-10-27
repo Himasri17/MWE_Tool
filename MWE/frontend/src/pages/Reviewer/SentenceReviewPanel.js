@@ -11,6 +11,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import UndoIcon from '@mui/icons-material/Undo';    
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import { removeToken ,getToken} from '../../components/authUtils'; 
 
 export default function SentenceReviewPanel() {
     const { username, projectId, targetUsername } = useParams();
@@ -256,7 +257,51 @@ export default function SentenceReviewPanel() {
         }
     };
     // --- Handlers ---
-    const handleLogout = async () => { navigate('/login'); };
+    const handleLogout = async () => { 
+        try {
+            const token = getToken(); // Use getToken from authUtils
+            const reviewerEmail = localStorage.getItem('username');
+            
+            console.log('🔐 Logout Debug - Before API call:', { 
+                token: token ? 'Present' : 'Missing', 
+                reviewerEmail 
+            });
+
+            if (token && reviewerEmail) {
+                const response = await fetch('http://127.0.0.1:5001/logout', {
+                    method: "POST",
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ 
+                        username: reviewerEmail
+                    }),
+                });
+
+                console.log('🔐 Logout API Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('🔐 Logout API Success:', data);
+                } else {
+                    console.error('🔐 Logout API Failed:', await response.text());
+                }
+            } else {
+                console.warn('🔐 Missing token or username for logout');
+            }
+        } catch (error) {
+            console.error('❌ Logout error:', error);
+        } finally {
+            localStorage.removeItem('username');
+            removeToken(); // Use the function from authUtils
+            navigate("/login");
+        }
+    };
     const handleBack = () => { navigate(`/reviewer/dashboard`); };
     const handleRefresh = () => { fetchSentencesForReview(false); setSelectedSentenceData(null); };
 

@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
     Container, Box, Typography, TextField, Button, Paper, Link as MuiLink,
     InputAdornment, IconButton, FormControl, InputLabel, Select, MenuItem, useTheme,
-    // Import Dialog components for use in ContactUsDialog
+    CircularProgress
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import EmailIcon from '@mui/icons-material/Email';
@@ -27,12 +27,11 @@ export default function Register() {
     const [languages, setLanguages] = useState(''); 
     const [error, setError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false); 
     const navigate = useNavigate();
     
     // RETAIN: Only the 'open' state is needed here to control the dialog
     const [isContactDialogOpen, setIsContactDialogOpen] = useState(false); // <--- ADD DIALOG STATE
-    
-    
     
     const theme = useTheme();
 
@@ -40,55 +39,58 @@ export default function Register() {
     const roleOptions = [{ value: 'user', label: 'Annotator/User' }, { value: 'admin', label: 'Admin' }, { value: 'reviewer', label: 'Reviewer' }];
     const languageOptions = ['English', 'Hindi', 'Marathi', 'Assamese', 'Boro', 'Nepali', 'Manipuri', 'Bangla', 'Maithili', 'Konkani'];
     const organizationOptions = [
-        'NBU', 'DU', 'IITM', 'IITB', 'IIT BHU', 'IITH', 'GU', 'IIITH',
+        'NBU', 'DU', 'IITM', 'IITB', 'IIT BHU', 'GU', 'IIITH',
         'NIT Manipur', 'NIT Meghalaya', 'JNU', 'CDAC-Pune', 'Goa University'
     ];
 
-    // --- Register Handler (UNCHANGED) ---
+    // --- Register Handler (UPDATED WITH LOADING) ---
     const handleRegister = async (event) => {
-    event.preventDefault();
-    setError(''); // Clear previous errors
+        event.preventDefault();
+        setError(''); // Clear previous errors
 
-    if (!fullName || !email || !password || !role || !organization) {
-        setError("Please fill in all required fields.");
-        return;
-    }
-
-    try {
-        const response = await fetch('http://127.0.0.1:5001/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                fullName,
-                email,
-                password,
-                // CRITICAL: Ensure the role variable (which holds 'reviewer') is sent
-                role, 
-                organization,
-                // Ensure languages is sent as an array
-                languages: Array.isArray(languages) ? languages : [languages], 
-            }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            // Handle HTTP errors (400, 403, etc.) returned by the backend
-            const message = data.message || "Registration failed. Please try again.";
-            setError(message);
+        if (!fullName || !email || !password || !role || !organization) {
+            setError("Please fill in all required fields.");
             return;
         }
 
-        // Success: Display success message and navigate to login
-        alert(data.message);
-        navigate('/login');
+        setIsLoading(true); // START LOADING
 
-    } catch (err) {
-        console.error("Network Error during registration:", err);
-        setError("Network error. Could not connect to the registration service.");
-    }
-};
-    
+        try {
+            const response = await fetch('http://127.0.0.1:5001/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    fullName,
+                    email,
+                    password,
+                    // CRITICAL: Ensure the role variable (which holds 'reviewer') is sent
+                    role, 
+                    organization,
+                    // Ensure languages is sent as an array
+                    languages: Array.isArray(languages) ? languages : [languages], 
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                // Handle HTTP errors (400, 403, etc.) returned by the backend
+                const message = data.message || "Registration failed. Please try again.";
+                setError(message);
+                return;
+            }
+
+            // Success: Display success message and navigate to login
+            alert(data.message);
+            navigate('/login');
+
+        } catch (err) {
+            console.error("Network Error during registration:", err);
+            setError("Network error. Could not connect to the registration service.");
+        } finally {
+            setIsLoading(false); // STOP LOADING
+        }
+    };
     
     // --- Password Visibility Handlers (UNCHANGED) ---
     const handleClickShowPassword = () => { setShowPassword(!showPassword); };
@@ -114,11 +116,50 @@ export default function Register() {
                     <Box component="form" onSubmit={handleRegister} noValidate sx={{ width: '100%' }}>
                         {/* ... (All form fields: Full Name, Email, Password, Languages, Role, Organization - UNCHANGED) ... */}
                         
-                        <TextField margin="normal" required fullWidth label="Full Name" variant="outlined" value={fullName} onChange={(e) => setFullName(e.target.value)} sx={{ mb: 2 }} InputProps={{ startAdornment: (<InputAdornment position="start"><PersonIcon color="action" /></InputAdornment>), }} />
-                        <TextField margin="normal" required fullWidth label="Email" type="email" variant="outlined" value={email} onChange={(e) => setEmail(e.target.value)} sx={{ mb: 2 }} InputProps={{ startAdornment: (<InputAdornment position="start"><EmailIcon color="action" /></InputAdornment>), }} />
+                        <TextField 
+                            margin="normal" 
+                            required 
+                            fullWidth 
+                            label="Full Name" 
+                            variant="outlined" 
+                            value={fullName} 
+                            onChange={(e) => setFullName(e.target.value)} 
+                            sx={{ mb: 2 }} 
+                            InputProps={{ 
+                                startAdornment: (<InputAdornment position="start"><PersonIcon color="action" /></InputAdornment>), 
+                            }} 
+                            disabled={isLoading}
+                        />
+                        <TextField 
+                            margin="normal" 
+                            required 
+                            fullWidth 
+                            label="Email" 
+                            type="email" 
+                            variant="outlined" 
+                            value={email} 
+                            onChange={(e) => setEmail(e.target.value)} 
+                            sx={{ mb: 2 }} 
+                            InputProps={{ 
+                                startAdornment: (<InputAdornment position="start"><EmailIcon color="action" /></InputAdornment>), 
+                            }} 
+                            disabled={isLoading}
+                        />
                         <TextField
-                            margin="normal" required fullWidth label="Password" type={showPassword ? 'text' : 'password'} variant="outlined" value={password} onChange={(e) => setPassword(e.target.value)} sx={{ mb: 2 }}
-                            InputProps={{ startAdornment: (<InputAdornment position="start"><LockIcon color="action" /></InputAdornment>), endAdornment: (<InputAdornment position="end"><IconButton onClick={handleClickShowPassword} onMouseDown={handleMouseDownPassword} edge="end">{showPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment>), }}
+                            margin="normal" 
+                            required 
+                            fullWidth 
+                            label="Password" 
+                            type={showPassword ? 'text' : 'password'} 
+                            variant="outlined" 
+                            value={password} 
+                            onChange={(e) => setPassword(e.target.value)} 
+                            sx={{ mb: 2 }}
+                            InputProps={{ 
+                                startAdornment: (<InputAdornment position="start"><LockIcon color="action" /></InputAdornment>), 
+                                endAdornment: (<InputAdornment position="end"><IconButton onClick={handleClickShowPassword} onMouseDown={handleMouseDownPassword} edge="end" disabled={isLoading}>{showPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment>), 
+                            }}
+                            disabled={isLoading}
                         />
                         
                         <FormControl fullWidth margin="normal" sx={{ mb: 2 }}>
@@ -129,6 +170,7 @@ export default function Register() {
                                 onChange={(e) => setLanguages(e.target.value)} 
                                 label="Select Languages (Optional)"
                                 startAdornment={<InputAdornment position="start"><LanguageIcon color="action" /></InputAdornment>}
+                                disabled={isLoading}
                             >
                                 {languageOptions.map((lang) => (<MenuItem key={lang} value={lang}>{lang}</MenuItem>))}
                             </Select>
@@ -136,22 +178,45 @@ export default function Register() {
 
                         <FormControl fullWidth margin="normal" required sx={{ mb: 2 }}>
                             <InputLabel id="role-label">Role</InputLabel>
-                            <Select labelId="role-label" value={role} onChange={(e) => setRole(e.target.value)} label="Role" startAdornment={<InputAdornment position="start"><GroupIcon color="action" /></InputAdornment>}>
+                            <Select 
+                                labelId="role-label" 
+                                value={role} 
+                                onChange={(e) => setRole(e.target.value)} 
+                                label="Role" 
+                                startAdornment={<InputAdornment position="start"><GroupIcon color="action" /></InputAdornment>}
+                                disabled={isLoading}
+                            >
                                 {roleOptions.map((option) => (<MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>))}
                             </Select>
                         </FormControl>
                         
                         <FormControl fullWidth margin="normal" required sx={{ mb: 1 }}>
                             <InputLabel id="organization-label">Organization</InputLabel>
-                            <Select labelId="organization-label" value={organization} onChange={(e) => setOrganization(e.target.value)} label="Organization" startAdornment={<InputAdornment position="start"><BusinessIcon color="action" /></InputAdornment>}>
+                            <Select 
+                                labelId="organization-label" 
+                                value={organization} 
+                                onChange={(e) => setOrganization(e.target.value)} 
+                                label="Organization" 
+                                startAdornment={<InputAdornment position="start"><BusinessIcon color="action" /></InputAdornment>}
+                                disabled={isLoading}
+                            >
                                 {organizationOptions.map((org) => (<MenuItem key={org} value={org}>{org}</MenuItem>))}
                             </Select>
                         </FormControl>
 
                         {error && (<Typography color="error" variant="body2" sx={{ mt: 1, mb: 2 }}>{error}</Typography>)}
 
-                        <Button type="submit" fullWidth variant="contained" size="large" color="secondary" sx={{ mt: 3, mb: 2, py: 1.5, fontWeight: 'bold', letterSpacing: 1 }} onClick={handleRegister}>
-                            CREATE ACCOUNT
+                        <Button 
+                            type="submit" 
+                            fullWidth 
+                            variant="contained" 
+                            size="large" 
+                            color="secondary" 
+                            sx={{ mt: 3, mb: 2, py: 1.5, fontWeight: 'bold', letterSpacing: 1 }} 
+                            onClick={handleRegister}
+                            disabled={isLoading}
+                        >
+                            {isLoading ? <CircularProgress size={24} color="inherit" /> : 'CREATE ACCOUNT'}
                         </Button>
                         
                         <Typography align="center" variant="body2" color="text.secondary">

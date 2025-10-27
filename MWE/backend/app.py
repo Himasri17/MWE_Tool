@@ -4514,8 +4514,7 @@ def approve_tag(tag_id):
         
         # Insert into final collections
         tags_collection.insert_one(final_tag)
-        search_tags_collection.insert_one(final_tag)
-        
+
         # Remove from staged collection
         staged_tags_collection.delete_one({"_id": ObjectId(tag_id)})
         
@@ -4654,6 +4653,21 @@ def reject_tag(tag_id):
             }}
         )
         
+        final_tag = {
+            'tag': staged_tag.get('tag'),
+            'source_sentence_id': staged_tag.get('source_sentence_id'),
+            'username': staged_tag.get('username'),
+            'text': staged_tag.get('text'),
+            'annotation_date': staged_tag.get('annotation_date'),
+            'review_status': 'Rejected',  
+            'review_comments': data.get('comments', ''),
+            'reviewed_by': reviewer_username,
+            'reviewed_at': datetime.utcnow()
+        }
+        
+        # Insert into final collections
+        tags_collection.delete_one(final_tag)
+        
         # Update sentence status
         update_sentence_review_status(sentence_id)
         
@@ -4691,18 +4705,14 @@ def get_tags(username):
             print(f"DEBUG: No sentences found for user {username}")
             return jsonify([])
         
-        # Get all tags for these sentences (from both collections)
-        staged_tags = list(staged_tags_collection.find({
-            'source_sentence_id': {'$in': user_sentence_ids}
-        }))
+        
         final_tags = list(tags_collection.find({
             'source_sentence_id': {'$in': user_sentence_ids}
         }))
         
-        print(f"DEBUG: Found {len(staged_tags)} staged tags and {len(final_tags)} final tags")
-        
+     
         # Combine and convert IDs to string
-        all_tags = staged_tags + final_tags
+        all_tags = final_tags
         user_tags = []
         
         for tag in all_tags:
