@@ -3022,6 +3022,56 @@ def recommend_tags():
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
 
+@app.route("/api/analytics/reviewer-stats", methods=["GET"])
+@token_required
+def get_reviewer_stats():
+    """Get reviewer-specific statistics"""
+    try:
+        current_user = request.current_user
+        reviewer_username = current_user.get('username')
+        
+        # Count total projects with annotations
+        total_projects = projects_collection.count_documents({})
+        
+        # Count total sentences reviewed by this reviewer
+        total_sentences_reviewed = tags_collection.count_documents({
+            "reviewed_by": reviewer_username
+        })
+        
+        # Count pending reviews (staged tags not reviewed by this reviewer)
+        pending_reviews = staged_tags_collection.count_documents({
+            "review_status": "Pending"
+        })
+        
+        # Calculate review accuracy (approved vs rejected)
+        approved_count = tags_collection.count_documents({
+            "reviewed_by": reviewer_username,
+            "review_status": "Approved"
+        })
+        rejected_count = tags_collection.count_documents({
+            "reviewed_by": reviewer_username, 
+            "review_status": "Rejected"
+        })
+        
+        total_reviewed = approved_count + rejected_count
+        review_accuracy = (approved_count / total_reviewed * 100) if total_reviewed > 0 else 0
+        
+        return jsonify({
+            "totalProjects": total_projects,
+            "totalSentencesReviewed": total_sentences_reviewed,
+            "pendingReviews": pending_reviews,
+            "reviewAccuracy": round(review_accuracy, 1)
+        }), 200
+        
+    except Exception as e:
+        print(f"Error fetching reviewer stats: {e}")
+        return jsonify({
+            "totalProjects": 0,
+            "totalSentencesReviewed": 0, 
+            "pendingReviews": 0,
+            "reviewAccuracy": 0
+        }), 200
+        
 @app.route("/api/recommend-tags/text", methods=["POST"])
 def recommend_tags_from_text():
     """
@@ -3124,6 +3174,9 @@ def recommend_tags_from_text():
     except Exception as e:
         print(f"Error generating text tag recommendations: {e}")
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+
+
+
 
 
 @app.route("/api/recommendation-stats", methods=["GET"])
