@@ -23,7 +23,7 @@ import AssignUsersDialog from './AssignUsersDialog';
 import EditProjectModal from './EditProjectModal';
 import ContactUsDialog from '../User/ContactUsDialog';
 import TermsDialog from '../User Authentication/TermsDialog';
-import { getAuthHeaders, removeToken } from '../../components/authUtils'; 
+import { getAuthHeaders, removeToken ,refreshTokenIfNeeded} from '../../components/authUtils'; 
 import Navbar from '../../components/Navbar';
 
 export default function AdminDashboard() {
@@ -65,6 +65,9 @@ export default function AdminDashboard() {
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
+
+            await refreshTokenIfNeeded();
+        
             const [projectsResponse, pendingUsersResponse, feedbacksResponse] = await Promise.all([
                 fetch("http://127.0.0.1:5001/api/projects", {
                     headers: getAuthHeaders()
@@ -115,6 +118,38 @@ export default function AdminDashboard() {
             setIsLoading(false); 
         }
     }, []);
+
+    useEffect(() => {
+        const validateAdminAccess = async () => {
+            try {
+                const token = localStorage.getItem('jwt_token');
+                if (!token) {
+                    handleUnauthorized();
+                    return;
+                }
+
+                // Decode token to check role
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                if (payload.role !== 'admin') {
+                    showSnackbar('Admin access required. Please log in as admin.', 'error');
+                    // Redirect to login after a delay
+                    setTimeout(() => {
+                        removeToken();
+                        navigate('/login');
+                    }, 2000);
+                    return;
+                }
+
+                // Token is valid, proceed with data fetch
+                fetchData();
+            } catch (error) {
+                console.error('Token validation error:', error);
+                handleUnauthorized();
+            }
+        };
+
+        validateAdminAccess();
+    }, [navigate]);
 
     // --- Auto-refresh useEffect - MOVED AFTER fetchData definition ---
     useEffect(() => {

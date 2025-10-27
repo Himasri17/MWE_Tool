@@ -65,7 +65,7 @@ export default function UserLogbook() {
         }
     };
 
-    // Calculate comprehensive user statistics
+    // In UserLogBook.js - Fix the calculateUserStats function
     const calculateUserStats = (sessions) => {
         const stats = {
             totalUsers: new Set(sessions.map(s => s.username)).size,
@@ -79,6 +79,14 @@ export default function UserLogbook() {
         const userData = {};
 
         sessions.forEach(session => {
+            // Skip sessions that only have "Session ended with no tasks"
+            const hasRealTasks = session.tasksDone && session.tasksDone.some(task => 
+                task !== "Session ended with no tasks" && 
+                task !== "Active session - no tasks recorded"
+            );
+            
+            if (!hasRealTasks) return; // Skip this session
+
             const user = session.username;
             if (!userData[user]) {
                 userData[user] = {
@@ -100,28 +108,41 @@ export default function UserLogbook() {
                 userData[user].totalSessionTime += duration;
             }
 
-            // Analyze tasks for annotations and tags
+            // Analyze tasks for annotations and tags - IMPROVED DETECTION
             session.tasksDone?.forEach(task => {
-                if (task.includes('annotated') || task.includes('Annotation')) {
-                    userData[user].annotations++;
-                    stats.totalAnnotations++;
+                if (task === "Session ended with no tasks" || 
+                    task === "Active session - no tasks recorded") {
+                    return; // Skip these placeholder tasks
                 }
-                if (task.includes('tag') || task.includes('Tag')) {
-                    userData[user].tags++;
-                    stats.totalTags++;
-                }
-                
-                // Track unique tasks
-                if (!userData[user].tasksCompleted.includes(task)) {
-                    userData[user].tasksCompleted.push(task);
+
+                // Enhanced annotation detection
+                if (task.toLowerCase().includes('annotat') || 
+                    task.toLowerCase().includes('tag') ||
+                    task.toLowerCase().includes('mwe') ||
+                    task.toLowerCase().includes('phrase')) {
+                    
+                    if (task.toLowerCase().includes('annotat')) {
+                        userData[user].annotations++;
+                        stats.totalAnnotations++;
+                    }
+                    if (task.toLowerCase().includes('tag')) {
+                        userData[user].tags++;
+                        stats.totalTags++;
+                    }
+                    
+                    // Track unique tasks
+                    if (!userData[user].tasksCompleted.includes(task)) {
+                        userData[user].tasksCompleted.push(task);
+                    }
                 }
             });
         });
 
-        // Calculate averages
-        if (stats.totalSessions > 0) {
+        // Calculate averages only for sessions with real tasks
+        const sessionsWithRealTasks = Object.values(userData).reduce((sum, user) => sum + user.sessions, 0);
+        if (sessionsWithRealTasks > 0) {
             const totalTime = Object.values(userData).reduce((sum, user) => sum + user.totalSessionTime, 0);
-            stats.averageSessionTime = totalTime / stats.totalSessions;
+            stats.averageSessionTime = totalTime / sessionsWithRealTasks;
         }
 
         stats.userBreakdown = userData;
@@ -578,36 +599,36 @@ export default function UserLogbook() {
                                     {selectedSession.tasksDone?.length || 0}
                                 </Typography>
                             </Grid>
-                            <Grid item xs={12}>
-                                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                                    Tasks Completed
-                                </Typography>
-                                <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
-                                    {selectedSession.tasksDone?.length > 0 ? (
-                                        selectedSession.tasksDone.map((task, index) => (
-                                            <Box
-                                                key={index}
-                                                sx={{
-                                                    p: 1,
-                                                    mb: 1,
-                                                    bgcolor: 'background.default',
-                                                    borderRadius: 1,
-                                                    border: '1px solid',
-                                                    borderColor: 'divider'
-                                                }}
-                                            >
-                                                <Typography variant="body2">
-                                                    {task}
-                                                </Typography>
-                                            </Box>
-                                        ))
-                                    ) : (
-                                        <Typography variant="body2" color="text.secondary">
-                                            No tasks recorded for this session.
-                                        </Typography>
-                                    )}
-                                </Box>
-                            </Grid>
+                                <Grid item xs={12}>
+                                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                        Tasks Completed
+                                    </Typography>
+                                    <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
+                                        {selectedSession.tasksDone?.length > 0 ? (
+                                            selectedSession.tasksDone.map((task, index) => (
+                                                <Box
+                                                    key={index}
+                                                    sx={{
+                                                        p: 1,
+                                                        mb: 1,
+                                                        bgcolor: 'background.default',
+                                                        borderRadius: 1,
+                                                        border: '1px solid',
+                                                        borderColor: 'divider'
+                                                    }}
+                                                >
+                                                    <Typography variant="body2">
+                                                        {task}
+                                                    </Typography>
+                                                </Box>
+                                            ))
+                                        ) : (
+                                            <Typography variant="body2" color="text.secondary" fontStyle="italic">
+                                                No tasks recorded for this session.
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                </Grid>
                         </Grid>
                     )}
                 </DialogContent>

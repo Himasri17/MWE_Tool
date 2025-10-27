@@ -968,22 +968,48 @@ export default function Dashboard() {
                                 </Box>
                             ) : (
                                 <Box>
-                                    <Typography variant="overline">TAGS FOR THIS SENTENCE</Typography>
-
+                                    <Typography variant="overline">TAGS FOR THIS SENTENCE</Typography>  
                                     <Box sx={{ my: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                                         {currentSentenceTags.map(tag => (
                                             <Chip 
                                                 key={tag._id} 
-                                                label={`${tag.text} (${tag.tag})`} 
-                                                onDelete={() => handleRemoveTag(tag._id)} 
+                                                label={
+                                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                        {tag.text} ({tag.tag})
+                                                        {tag.status === 'pending' && (
+                                                            <Box 
+                                                                sx={{ 
+                                                                    ml: 1,
+                                                                    width: 8, 
+                                                                    height: 8, 
+                                                                    borderRadius: '50%', 
+                                                                    backgroundColor: '#ff9800',
+                                                                    animation: 'pulse 1.5s infinite'
+                                                                }} 
+                                                                title="Pending Review"
+                                                            />
+                                                        )}
+                                                    </Box>
+                                                }
+                                                onDelete={tag.status === 'approved' ? () => handleRemoveTag(tag._id) : undefined}
                                                 onClick={() => handleStartEditTag(tag)} 
-                                                color="primary" 
-                                                sx={{ cursor: "pointer" }}
-                                                title={`Annotated by: ${tag.username}`}
+                                                color={tag.status === 'pending' ? "default" : "primary"}
+                                                variant={tag.status === 'pending' ? "outlined" : "filled"}
+                                                sx={{ 
+                                                    cursor: "pointer",
+                                                    border: tag.status === 'pending' ? '2px dashed #ff9800' : 'none',
+                                                    position: 'relative',
+                                                    opacity: tag.status === 'pending' ? 0.8 : 1
+                                                }}
+                                                title={
+                                                    tag.status === 'pending' 
+                                                        ? `Pending review - ${tag.review_comments || 'No comments'}`
+                                                        : `Approved - Annotated by: ${tag.username}`
+                                                }
                                             />
                                         ))}
                                         
-                                        {currentSentenceTags.length === 0 && autoTags.length === 0 && (
+                                        {currentSentenceTags.length === 0 && (
                                             <Typography color="text.secondary">No tags yet. Highlight text to add one.</Typography>
                                         )}
                                     </Box>

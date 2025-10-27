@@ -108,6 +108,17 @@ def verify_jwt_token(token):
     """Verify JWT token and return payload if valid"""
     try:
         payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=[app.config['JWT_ALGORITHM']])
+        
+        # Additional check: verify user still exists and has same role
+        user = users_collection.find_one({"username": payload.get('username')})
+        if not user:
+            return None  # User no longer exists
+            
+        # Optional: Verify role hasn't changed
+        if user.get('role') != payload.get('role'):
+            # Role changed, token is outdated
+            return None
+            
         return payload
     except jwt.ExpiredSignatureError:
         return None  # Token has expired
@@ -320,12 +331,11 @@ def update_session_history_report(username_to_update):
         
         if desc == "Login":
             if session:
-                # Close previous session if it exists
-                prev_logout_ist = act['timestamp'].replace(tzinfo=UTC).astimezone(IST)
-                session["logoutTimeIST"] = prev_logout_ist.strftime('%d/%m/%Y, %H:%M:%S')
-                if not session["tasksDone"]:
-                    session["tasksDone"].append("Session ended with no tasks")
-                logs_list.append(session)
+                # Only add session if it has real tasks OR was properly closed
+                if session["tasksDone"] or session["logoutTimeIST"]:
+                    logs_list.append(session)
+                # Otherwise, discard empty active sessions
+                # REMOVED: session["tasksDone"].append("Session ended with no tasks")
             
             login_ist = utc_ts.replace(tzinfo=UTC).astimezone(IST)
             session = {
@@ -339,19 +349,25 @@ def update_session_history_report(username_to_update):
         elif desc == "Logout" and session:
             logout_ist = utc_ts.replace(tzinfo=UTC).astimezone(IST)
             session["logoutTimeIST"] = logout_ist.strftime('%d/%m/%Y, %H:%M:%S')
-            logs_list.append(session)
+            
+            # Only add to logs if session has real tasks
+            if session["tasksDone"]:
+                logs_list.append(session)
+            # REMOVED: else: session["tasksDone"].append("Session ended with no tasks")
+            
             session = None
             
         elif session and desc not in ["Login", "Logout"]:
-            # Add task to current session, avoiding duplicates
+            # Add real task to current session, avoiding duplicates
             if desc not in session["tasksDone"]:
                 session["tasksDone"].append(desc)
     
-    # Handle the last session if it wasn't closed
+    # Handle the last session if it wasn't closed (active session)
     if session:
-        if not session["tasksDone"]:
-            session["tasksDone"].append("Active session - no tasks recorded")
-        logs_list.append(session)
+        # Only keep active sessions that have real tasks
+        if session["tasksDone"]:
+            logs_list.append(session)
+        # REMOVED: Automatic addition of "Active session - no tasks recorded"
 
     # Sort sessions by login time (newest first)
     sorted_sessions = sorted(logs_list, key=lambda s: s.get('loginTimeIST', ''), reverse=True)
@@ -362,8 +378,8 @@ def update_session_history_report(username_to_update):
         {'$set': {'sessions': sorted_sessions}},
         upsert=True
     )
-    print(f"User session history for '{username_to_update}' has been updated with {len(sorted_sessions)} sessions.")
-    
+    print(f"User session history for '{username_to_update}' has been updated with {len(sorted_sessions)} real sessions.")
+         
 def log_action_and_update_report(username, description):
     """Logs a new raw event and triggers a rebuild of that user's session history report. (UNCHANGED)"""
     user_activities_collection.update_one(
@@ -4269,8 +4285,7 @@ def get_project_sentences(project_id):
             # Determine if the annotator has touched the sentence at all
             is_annotated_from_tags = len(s.get("final_tags", [])) > 0 or len(staged_tags) > 0
             
-            # Use the DB status, but if the sentence is now 'annotated' and previously was unreviewed ('Pending'), 
-            # the frontend will visually default it to 'Approved' unless staged tags exist.
+     
             overall_review_status = s.get("review_status", "Pending")
             
             # --- END: MODIFIED LOGIC BLOCK ---
@@ -4687,7 +4702,7 @@ def reject_tag(tag_id):
 @app.route('/tags/<username>', methods=['GET'])
 def get_tags(username):
     """
-    FIXED: Gets all tags for sentences assigned to the user, regardless of tag creator
+    FIXED: Gets all tags (both final and staged) for sentences assigned to the user
     """
     try:
         print(f"DEBUG: Fetching tags for user: {username}")
@@ -4705,24 +4720,46 @@ def get_tags(username):
             print(f"DEBUG: No sentences found for user {username}")
             return jsonify([])
         
-        
+        # Get final approved tags
         final_tags = list(tags_collection.find({
             'source_sentence_id': {'$in': user_sentence_ids}
         }))
         
-     
-        # Combine and convert IDs to string
-        all_tags = final_tags
+        # Get staged/pending tags
+        staged_tags = list(staged_tags_collection.find({
+            'source_sentence_id': {'$in': user_sentence_ids}
+        }))
+        
+        print(f"DEBUG: Found {len(final_tags)} final tags and {len(staged_tags)} staged tags")
+        
         user_tags = []
         
-        for tag in all_tags:
+        # Process final tags
+        for tag in final_tags:
             tag_data = {
                 "_id": str(tag["_id"]),
                 "text": tag.get("text", ""),
                 "tag": tag.get("tag", ""),
                 "source_sentence_id": tag.get("source_sentence_id", ""),
                 "username": tag.get("username", ""),
-                "annotation_date": tag.get("annotation_date")
+                "annotation_date": tag.get("annotation_date"),
+                "status": "approved",  # Add status field
+                "review_status": "Approved"
+            }
+            user_tags.append(tag_data)
+        
+        # Process staged tags
+        for tag in staged_tags:
+            tag_data = {
+                "_id": str(tag["_id"]),
+                "text": tag.get("text", ""),
+                "tag": tag.get("tag", ""),
+                "source_sentence_id": tag.get("source_sentence_id", ""),
+                "username": tag.get("username", ""),
+                "annotation_date": tag.get("annotation_date"),
+                "status": "pending",  # Add status field
+                "review_status": tag.get("review_status", "Pending"),
+                "review_comments": tag.get("review_comments", "")
             }
             user_tags.append(tag_data)
         
@@ -4735,7 +4772,7 @@ def get_tags(username):
         import traceback
         traceback.print_exc()
         return jsonify({"error": "Internal server error"}), 500
-      
+       
 @app.route("/sentences/<sentence_id>/status", methods=["PUT"])
 def update_sentence_status(sentence_id):
     data = request.json
