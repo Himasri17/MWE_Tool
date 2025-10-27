@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
     Box, Typography, Paper, Grid, Card, CardContent, Button,
     FormControl, InputLabel, Select, MenuItem, TextField,
@@ -52,6 +53,7 @@ const API_BASE_URL = 'http://127.0.0.1:5001';
 
 const AnalyticsDashboard = () => {
     const theme = useTheme();
+    const { username } = useParams();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     
     // State management
@@ -1279,7 +1281,7 @@ const AnalyticsDashboard = () => {
             }}
         >
 
-             <Navbar />
+             <Navbar  username={username}/>
             {/* Animated background elements */}
             <Box
                 sx={{

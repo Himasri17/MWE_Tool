@@ -23,7 +23,7 @@ import AssignUsersDialog from './AssignUsersDialog';
 import EditProjectModal from './EditProjectModal';
 import ContactUsDialog from '../User/ContactUsDialog';
 import TermsDialog from '../User Authentication/TermsDialog';
-import { getAuthHeaders, removeToken} from '../../components/authUtils'; 
+import { getAuthHeaders, removeToken ,refreshTokenIfNeeded} from '../../components/authUtils'; 
 import Navbar from '../../components/Navbar';
 
 export default function AdminDashboard() {
@@ -40,6 +40,7 @@ export default function AdminDashboard() {
     const [feedbacks, setFeedbacks] = useState([]);
     const [contactDialogOpen, setContactDialogOpen] = useState(false);
     const [termsDialogOpen, setTermsDialogOpen] = useState(false);
+
     
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
@@ -66,6 +67,7 @@ export default function AdminDashboard() {
         setIsLoading(true);
         try {
 
+            await refreshTokenIfNeeded();
         
             const [projectsResponse, pendingUsersResponse, feedbacksResponse] = await Promise.all([
                 fetch("http://127.0.0.1:5001/api/projects", {
