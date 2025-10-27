@@ -541,91 +541,128 @@ export default function SentenceReviewPanel() {
     };
 
     const renderSentenceBox = (sentence) => {
-        // --- Custom Pastel Color Definition ---
-        const PASTEL_GREEN_HEX = '#E8F5E9'; // Very light pastel green for background
-        const PASTEL_ACCENT_HEX = '#C8E6C9'; // Slightly deeper pastel green for border
+    // --- Custom Pastel Color Definition ---
+    const PASTEL_GREEN_HEX = '#E8F5E9'; // Very light pastel green for Approved background
+    const PASTEL_ACCENT_HEX = '#C8E6C9'; // Slightly deeper pastel green for Approved border
 
-        // --- UPDATED LOGIC FOR VISUAL STATUS ---
-        const pendingTagsCount = sentence.tags.filter(t => t.review_status === 'Pending').length;
-        const approvedTagsCount = sentence.tags.filter(t => t.review_status === 'Approved').length;
+    const PASTEL_BLUE_HEX = '#E3F2FD'; // Light pastel blue for Annotated-Pending background
+    const PASTEL_BLUE_ACCENT_HEX = '#90CAF9'; // Deeper pastel blue for Annotated-Pending border
 
-        // Determine the effective status for display on the list
-        let effectiveReviewStatus = sentence.review_status || 'Pending';
-        
-        // 1. If pending tags exist, it must be 'Pending'.
-        if (pendingTagsCount > 0) {
-            effectiveReviewStatus = 'Pending'; 
-        } 
-        // 2. If no pending tags, AND either approved tags exist OR it's been marked annotated 
-        else if (approvedTagsCount > 0 || sentence.is_annotated) {
-            effectiveReviewStatus = 'Approved'; 
-        } 
-        // 3. Otherwise, use the DB status (usually 'Pending' for untouched sentences)
-        else {
-            effectiveReviewStatus = sentence.review_status || 'Pending';
-        }
+    // --- UPDATED LOGIC FOR VISUAL STATUS ---
+    const pendingTagsCount = sentence.tags.filter(t => t.review_status === 'Pending').length;
+    const approvedTagsCount = sentence.tags.filter(t => t.review_status === 'Approved').length;
 
-        let accentColor = theme.palette.grey[300]; 
-        if (effectiveReviewStatus === 'Pending') {
-            accentColor = theme.palette.warning.main; 
-        } else if (effectiveReviewStatus === 'Approved') {
-            accentColor = PASTEL_ACCENT_HEX; 
-        } else if (effectiveReviewStatus === 'Rejected') {
-            accentColor = theme.palette.error.main; 
-        }
-        
-        const isSelected = selectedSentenceData?._id === sentence._id;
+    // Determine the effective status for display on the list
+    let effectiveReviewStatus = sentence.review_status || 'Pending';
+    
+    // 1. If pending tags exist, it must be 'Pending'.
+    if (pendingTagsCount > 0) {
+        effectiveReviewStatus = 'Pending'; 
+    } 
+    // 2. If all tags are approved, it's 'Approved'.
+    else if (approvedTagsCount > 0 && pendingTagsCount === 0) {
+        effectiveReviewStatus = 'Approved'; 
+    } 
+    // 3. Otherwise, use the DB status (which might be 'Rejected' or 'Pending')
+    else {
+        effectiveReviewStatus = sentence.review_status || 'Pending';
+    }
 
-        return (
-            <Paper
-                key={sentence._id}
-                onClick={() => handleSentenceClick(sentence)} 
-                elevation={isSelected ? 3 : 1}
-                sx={{
-                    p: 2, mb: 2, cursor: 'pointer', 
-                    // Use effectiveReviewStatus for background color logic
-                    backgroundColor: isSelected 
-                        ? theme.palette.action.selected 
-                        // Use the custom pastel green for Approved background.
-                        : (effectiveReviewStatus === 'Approved' ? PASTEL_GREEN_HEX : theme.palette.common.white),
-                    borderLeft: `5px solid ${accentColor}`,
-                    borderRight: isSelected ? `2px solid ${accentColor}` : 'none',
-                    '&:hover': { backgroundColor: theme.palette.action.hover, boxShadow: theme.shadows[2] },
-                    transition: 'all 0.2s ease-in-out'
-                }}
-            >
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <Typography 
-                        variant="body1" 
-                        sx={{ 
-                            fontWeight: 500, color: theme.palette.text.primary,
-                            wordBreak: 'break-word', flex: 1
-                        }}
-                    >
-                        {sentence.textContent}
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5, ml: 1 }}>
+    // --- NEW COLOR ASSIGNMENT LOGIC ---
+    let accentColor = theme.palette.grey[300]; 
+    let backgroundColor = theme.palette.common.white;
+    
+    // Determine if the sentence is in the special Annotated & Pending state
+    const isAnnotatedAndPending = sentence.is_annotated && effectiveReviewStatus === 'Pending';
+
+    // Condition 1: Approved (Pastel Green)
+    if (effectiveReviewStatus === 'Approved') {
+        accentColor = PASTEL_ACCENT_HEX; 
+        backgroundColor = PASTEL_GREEN_HEX;
+    } 
+    // Condition 2: Annotated but Still Pending (Pastel Blue)
+    else if (isAnnotatedAndPending) {
+        accentColor = PASTEL_BLUE_ACCENT_HEX; 
+        backgroundColor = PASTEL_BLUE_HEX;
+    }
+    // Condition 3: Pending/Non-Annotated (Orange/Warning Color)
+    else if (effectiveReviewStatus === 'Pending') {
+        accentColor = theme.palette.warning.main; 
+        backgroundColor = theme.palette.common.white;
+    } 
+    // Condition 4: Rejected (Error Color, White Background)
+    else if (effectiveReviewStatus === 'Rejected') {
+        accentColor = theme.palette.error.main; 
+        backgroundColor = theme.palette.common.white;
+    }
+    
+    const isSelected = selectedSentenceData?._id === sentence._id;
+
+    // --- CHIP COLOR LOGIC ---
+    let chipColor;
+    if (isAnnotatedAndPending) {
+        // Use primary color (blue) for the Annotated Pending chip
+        chipColor = 'primary';
+    } else if (effectiveReviewStatus === 'Approved') {
+        chipColor = 'success';
+    } else if (effectiveReviewStatus === 'Rejected') {
+        chipColor = 'error';
+    } else {
+        // Use warning color (orange) for standard Pending/non-annotated sentences
+        chipColor = 'warning';
+    }
+
+    return (
+        <Paper
+            key={sentence._id}
+            onClick={() => handleSentenceClick(sentence)} 
+            elevation={isSelected ? 3 : 1}
+            sx={{
+                p: 2, mb: 2, cursor: 'pointer', 
+                // Use the determined background color
+                backgroundColor: isSelected 
+                    ? theme.palette.action.selected 
+                    : backgroundColor,
+                // Use the determined accent color
+                borderLeft: `5px solid ${accentColor}`,
+                borderRight: isSelected ? `2px solid ${accentColor}` : 'none',
+                '&:hover': { backgroundColor: theme.palette.action.hover, boxShadow: theme.shadows[2] },
+                transition: 'all 0.2s ease-in-out'
+            }}
+        >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Typography 
+                    variant="body1" 
+                    sx={{ 
+                        fontWeight: 500, color: theme.palette.text.primary,
+                        wordBreak: 'break-word', flex: 1
+                    }}
+                >
+                    {sentence.textContent}
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5, ml: 1 }}>
+                    <Chip 
+                        // The chip status uses the effectiveReviewStatus for consistency
+                        label={effectiveReviewStatus}
+                        size="small" 
+                        // Use the new calculated chipColor
+                        color={chipColor} 
+                        variant="filled"
+                        sx={{ minWidth: 80, fontWeight: 'bold' }}
+                    />
+                    {sentence.tags && sentence.tags.length > 0 && (
                         <Chip 
-                            // Use the new effective status here
-                            label={effectiveReviewStatus}
+                            label={`${sentence.tags.length} tags`} 
                             size="small" 
-                            color={effectiveReviewStatus === 'Approved' ? 'success' : effectiveReviewStatus === 'Rejected' ? 'error' : 'warning'} 
-                            variant="filled"
-                            sx={{ minWidth: 80, fontWeight: 'bold' }}
+                            color="primary" 
+                            variant="outlined"
                         />
-                        {sentence.tags && sentence.tags.length > 0 && (
-                            <Chip 
-                                label={`${sentence.tags.length} tags`} 
-                                size="small" 
-                                color="primary" 
-                                variant="outlined"
-                            />
-                        )}
-                    </Box>
+                    )}
                 </Box>
-            </Paper>
-        );
-    };
+            </Box>
+        </Paper>
+    );
+};
     // --- END UPDATED LOGIC ---
 
     if (isLoading) {
