@@ -127,29 +127,44 @@ const AnalyticsDashboard = () => {
                 })
             ];
 
-            const [mweRes, comprehensiveRes, projectsRes] = await Promise.allSettled(endpoints);
+            const responses = await Promise.allSettled(endpoints);
 
-            // Process MWE data with better error handling
-            if (mweRes.status === 'fulfilled' && mweRes.value.ok) {
-                const mweData = await mweRes.value.json();
+            // Process each response with better error handling
+            responses.forEach((response, index) => {
+                if (response.status === 'fulfilled') {
+                    const res = response.value;
+                    if (res.status === 401 || res.status === 403) {
+                        console.error(`Authentication failed for endpoint ${index}`);
+                        handleUnauthorized();
+                        return;
+                    }
+                    if (!res.ok) {
+                        console.error(`Request failed for endpoint ${index}:`, res.status);
+                        return;
+                    }
+                } else {
+                    console.error(`Request rejected for endpoint ${index}:`, response.reason);
+                }
+            });
+
+            // Process MWE data
+            if (responses[0].status === 'fulfilled' && responses[0].value.ok) {
+                const mweData = await responses[0].value.json();
                 console.log("MWE Data:", mweData);
                 setAnalyticsData(mweData);
-            } else {
-                console.error("MWE data fetch failed:", mweRes.reason);
             }
 
             // Process comprehensive data
-            if (comprehensiveRes.status === 'fulfilled' && comprehensiveRes.value.ok) {
-                const comprehensiveData = await comprehensiveRes.value.json();
+            if (responses[1].status === 'fulfilled' && responses[1].value.ok) {
+                const comprehensiveData = await responses[1].value.json();
                 console.log("Comprehensive Data:", comprehensiveData);
                 setComprehensiveData(comprehensiveData);
-                
                 generateNotifications(comprehensiveData);
             }
 
             // Process projects
-            if (projectsRes.status === 'fulfilled' && projectsRes.value.ok) {
-                const projectsData = await projectsRes.value.json();
+            if (responses[2].status === 'fulfilled' && responses[2].value.ok) {
+                const projectsData = await responses[2].value.json();
                 setProjects(projectsData);
             }
 
@@ -670,520 +685,978 @@ const AnalyticsDashboard = () => {
             </motion.div>
         );
     };
+    
     const downloadReport = async (format) => {
-        setLoading(true);
-        setError('');
-        try {
-            const queryParams = new URLSearchParams();
-            queryParams.append('type', format);
-            Object.entries(filters).forEach(([key, value]) => {
-                if (value) queryParams.append(key, value);
+    setLoading(true);
+    setError('');
+    try {
+        const queryParams = new URLSearchParams();
+        queryParams.append('type', format);
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value) queryParams.append(key, value);
+        });
+
+        if (format === 'pdf') {
+            // Get comprehensive data for all charts
+            const [comprehensiveRes, mweRes, timelineRes] = await Promise.all([
+                fetch(`${API_BASE_URL}/api/analytics/comprehensive-report?${queryParams}&level=detailed`, {
+                    headers: getAuthHeaders()
+                }),
+                fetch(`${API_BASE_URL}/api/analytics/mwe-distribution?${queryParams}`, {
+                    headers: getAuthHeaders()
+                }),
+                fetch(`${API_BASE_URL}/api/analytics/annotation-timeline?${queryParams}`, {
+                    headers: getAuthHeaders()
+                })
+            ]);
+
+            if (comprehensiveRes.ok && mweRes.ok) {
+                const comprehensiveData = await comprehensiveRes.json();
+                const mweData = await mweRes.json();
+                const timelineData = timelineRes.ok ? await timelineRes.json() : [];
+                
+                console.log("All data for PDF:", { comprehensiveData, mweData, timelineData });
+                await generateEnhancedPdfReport(comprehensiveData, mweData, timelineData, projects);
+            } else {
+                if (comprehensiveRes.status === 401 || mweRes.status === 401) {
+                    handleUnauthorized();
+                    return;
+                }
+                throw new Error('Failed to fetch report data');
+            }
+        } else if (format === 'csv') {
+            // CSV download remains the same
+            const res = await fetch(`${API_BASE_URL}/api/analytics/reports/download?${queryParams}`, {
+                headers: getAuthHeaders()
             });
-
-            if (format === 'pdf') {
-                // Use the comprehensive report data for PDF generation
-                const reportRes = await fetch(`${API_BASE_URL}/api/analytics/comprehensive-report?${queryParams}&level=detailed`, {
-                    headers: getAuthHeaders()
-                });
-                
-                if (reportRes.ok) {
-                    const comprehensiveData = await reportRes.json();
-                    console.log("Comprehensive Report Data for PDF:", comprehensiveData);
-                    await generateEnhancedPdfReport(comprehensiveData);
-                } else {
-                    if (reportRes.status === 401) {
-                        handleUnauthorized();
-                        return;
-                    }
-                    throw new Error('Failed to fetch comprehensive report data');
+            
+            if (res.ok) {
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `comprehensive_annotation_report_${new Date().toISOString().split('T')[0]}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } else {
+                if (res.status === 401) {
+                    handleUnauthorized();
+                    return;
                 }
-            } else if (format === 'csv') {
-                // Use the enhanced download endpoint
-                const res = await fetch(`${API_BASE_URL}/api/analytics/reports/download?${queryParams}`, {
-                    headers: getAuthHeaders()
-                });
-                
-                if (res.ok) {
-                    const blob = await res.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `comprehensive_annotation_report_${new Date().toISOString().split('T')[0]}.csv`;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                } else {
-                    if (res.status === 401) {
-                        handleUnauthorized();
-                        return;
-                    }
-                    throw new Error('Failed to download CSV report');
-                }
+                throw new Error('Failed to download CSV report');
             }
-        } catch (error) {
-            console.error('Error during download:', error);
-            setError(`Download failed: ${error.message}`);
-        } finally {
-            setLoading(false);
         }
-    };
+    } catch (error) {
+        console.error('Error during download:', error);
+        setError(`Download failed: ${error.message}`);
+    } finally {
+        setLoading(false);
+    }
+};
 
-    const generateEnhancedPdfReport = async (reportData) => {
-        console.log("Generating Enhanced PDF with data:", reportData);
+const generateEnhancedPdfReport = async (comprehensiveData, mweData, timelineData, projects) => {
+    console.log("Generating Enhanced PDF with all charts...");
+    
+    const doc = new jsPDF();
+    let y = 15;
+    const margin = 10;
+    const lineHeight = 7;
+    const pageHeight = doc.internal.pageSize.height;
+    const pageWidth = doc.internal.pageSize.width;
+
+    // Helper functions
+    const addText = (text, size = 10, style = 'normal', x = margin, align = 'left', color = '#000000') => {
+        if (!text) return;
         
-        if (!reportData) {
-            console.error("No report data provided");
-            setError("No data available for PDF generation");
-            return;
-        }
-
-        const doc = new jsPDF();
-        let y = 15;
-        const margin = 10;
-        const lineHeight = 7;
-        const pageHeight = doc.internal.pageSize.height;
-        const pageWidth = doc.internal.pageSize.width;
-
-        // Helper functions
-        const addText = (text, size = 10, style = 'normal', x = margin, align = 'left', color = '#000000') => {
-            if (!text) return;
-            
-            doc.setFontSize(size);
-            doc.setFont(style === 'bold' ? 'helvetica-bold' : 'helvetica', style);
-            doc.setTextColor(color);
-            
-            const splitText = doc.splitTextToSize(String(text), pageWidth - margin * 2);
-            
-            for (const line of splitText) {
-                if (y > pageHeight - margin) {
-                    doc.addPage();
-                    y = 15;
-                }
-                
-                let xPos = x;
-                if (align === 'center') {
-                    const textWidth = doc.getStringUnitWidth(line) * doc.getFontSize() / doc.internal.scaleFactor;
-                    xPos = (pageWidth - textWidth) / 2;
-                } else if (align === 'right') {
-                    const textWidth = doc.getStringUnitWidth(line) * doc.getFontSize() / doc.internal.scaleFactor;
-                    xPos = pageWidth - margin - textWidth;
-                }
-                
-                doc.text(line, xPos, y);
-                y += lineHeight;
-            }
-            doc.setTextColor('#000000');
-        };
-
-        const addSectionHeader = (text) => {
-            y += lineHeight;
-            doc.setFillColor(41, 128, 185);
-            doc.rect(margin, y - 2, pageWidth - margin * 2, 8, 'F');
-            addText(text, 12, 'bold', margin + 5, 'left', '#ffffff');
-            y += lineHeight;
-        };
-
-        const addSubSection = (text) => {
-            y += lineHeight / 2;
-            addText(text, 11, 'bold', margin, 'left', '#2c3e50');
-            y += lineHeight / 2;
-        };
-
-        // Generate chart images
-        const generateChart = async (chartData, chartType, title, xLabel = '', yLabel = 'Count') => {
-            if (!chartData || chartData.length === 0) {
-                console.warn(`No data available for chart: ${title}`);
-                return null;
-            }
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/analytics/generate-chart`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...getAuthHeaders()
-                    },
-                    body: JSON.stringify({
-                        type: chartType,
-                        data: chartData,
-                        title: title,
-                        x_label: xLabel,
-                        y_label: yLabel
-                    })
-                });
-                
-                if (response.ok) {
-                    const result = await response.json();
-                    if (result.success) {
-                        return result.image_data;
-                    }
-                }
-                return null;
-            } catch (error) {
-                console.error('Error generating chart:', error);
-                return null;
-            }
-        };
-
-        const addChartImage = async (imageData, title, description = '') => {
-            if (y > pageHeight - 150) {
+        doc.setFontSize(size);
+        doc.setFont(style === 'bold' ? 'helvetica-bold' : 'helvetica', style);
+        doc.setTextColor(color);
+        
+        const splitText = doc.splitTextToSize(String(text), pageWidth - margin * 2);
+        
+        for (const line of splitText) {
+            if (y > pageHeight - margin) {
                 doc.addPage();
                 y = 15;
             }
             
-            if (!imageData) {
-                addText(`Chart unavailable: ${title}`, 10, 'italic', margin, 'center', '#e74c3c');
-                y += lineHeight;
-                return;
+            let xPos = x;
+            if (align === 'center') {
+                const textWidth = doc.getStringUnitWidth(line) * doc.getFontSize() / doc.internal.scaleFactor;
+                xPos = (pageWidth - textWidth) / 2;
+            } else if (align === 'right') {
+                const textWidth = doc.getStringUnitWidth(line) * doc.getFontSize() / doc.internal.scaleFactor;
+                xPos = pageWidth - margin - textWidth;
             }
-
-            try {
-                addSubSection(title);
-                
-                const chartWidth = pageWidth - margin * 2;
-                const chartHeight = 120;
-                
-                doc.addImage(imageData, 'PNG', margin, y, chartWidth, chartHeight);
-                y += chartHeight + 10;
-                
-                if (description) {
-                    addText(description, 9, 'normal', margin, 'left', '#7f8c8d');
-                    y += lineHeight;
-                }
-                
-            } catch (error) {
-                console.error('Error adding chart image:', error);
-                addText(`Chart display failed: ${title}`, 10, 'italic', margin, 'center', '#e74c3c');
-                y += lineHeight;
-            }
-        };
-
-        // --- COVER PAGE ---
-        doc.setFillColor(52, 152, 219);
-        doc.rect(0, 0, pageWidth, pageHeight, 'F');
-        
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(24);
-        doc.setFont('helvetica-bold', 'bold');
-        doc.text('COMPREHENSIVE ANALYTICS REPORT', pageWidth / 2, 80, { align: 'center' });
-        
-        doc.setFontSize(16);
-        doc.text('Sentence Annotation System', pageWidth / 2, 100, { align: 'center' });
-        
-        doc.setFontSize(12);
-        doc.text(`Generated on: ${reportData.report_metadata?.generated_at || new Date().toISOString()}`, pageWidth / 2, 120, { align: 'center' });
-        
-        // Check if filters were applied
-        const hasFilters = reportData.report_metadata?.filters_applied && 
-            Object.values(reportData.report_metadata.filters_applied).some(val => val);
-        if (hasFilters) {
-            doc.text('Custom Filter Report', pageWidth / 2, 130, { align: 'center' });
-        } else {
-            doc.text('Complete System Report', pageWidth / 2, 130, { align: 'center' });
-        }
-        
-        doc.addPage();
-        y = 15;
-
-        // --- EXECUTIVE SUMMARY ---
-        addSectionHeader('EXECUTIVE SUMMARY');
-        
-        const summary = reportData.executive_summary || reportData.summary || {};
-        addText('Comprehensive analytics report with enhanced metrics and insights.', 10, 'normal', margin);
-        y += lineHeight * 2;
-
-        // Key Metrics from enhanced data
-        addSubSection('SYSTEM OVERVIEW');
-        const metrics = [
-            { label: 'Total Annotations', value: summary.total_annotations || analyticsData?.summary?.total_annotations || 0 },
-            { label: 'Active Users', value: summary.total_users || analyticsData?.summary?.total_users || 0 },
-            { label: 'Projects', value: summary.total_projects || analyticsData?.summary?.total_projects || 0 },
-            { label: 'MWE Types', value: summary.total_mwe_types || analyticsData?.summary?.total_mwe_types || 0 },
-            { label: 'Languages', value: summary.total_languages || analyticsData?.summary?.total_languages || 0 }
-        ];
-        
-        metrics.forEach(metric => {
-            addText(`• ${metric.label}: ${metric.value.toLocaleString()}`, 10, 'normal', margin);
-            y += lineHeight;
-        });
-
-        // Quality Metrics if available
-        if (reportData.quality_metrics) {
-            y += lineHeight;
-            addSubSection('QUALITY METRICS');
-            const qualityMetrics = [
-                { label: 'User Engagement Score', value: `${reportData.quality_metrics.user_engagement_score?.toFixed(1) || 'N/A'}%` },
-                { label: 'Annotation Growth Rate', value: `${reportData.quality_metrics.annotation_growth_rate?.toFixed(1) || 'N/A'}%` },
-                { label: 'Overall Quality', value: reportData.quality_metrics.overall_annotation_quality || 'N/A' }
-            ];
             
-            qualityMetrics.forEach(metric => {
-                addText(`• ${metric.label}: ${metric.value}`, 10, 'normal', margin);
-                y += lineHeight;
-            });
-        }
-
-        // Applied Filters
-        if (hasFilters) {
+            doc.text(line, xPos, y);
             y += lineHeight;
-            addSubSection('APPLIED FILTERS');
-            Object.entries(reportData.report_metadata.filters_applied).forEach(([key, value]) => {
-                if (value) {
-                    addText(`- ${key}: ${value}`, 9, 'normal', margin);
-                    y += lineHeight;
-                }
-            });
         }
-
-        // Generate charts from comprehensive data
-        doc.addPage();
-        y = 15;
-        addSectionHeader('DATA VISUALIZATION');
-
-        // Prepare chart data from comprehensive report
-        const chartData = {
-            mwe_distribution: reportData.mwe_distribution || analyticsData?.mwe_types || [],
-            user_distribution: reportData.user_performance || analyticsData?.user_distribution || [],
-            project_distribution: reportData.project_progress || analyticsData?.project_distribution || [],
-            timeline_data: reportData.timeline_data || timelineData || []
-        };
-
-        // Generate charts
-        const chartsToGenerate = [
-            {
-                data: chartData.mwe_distribution,
-                type: 'bar',
-                title: 'MWE Type Distribution',
-                xLabel: 'MWE Types',
-                yLabel: 'Annotation Count'
-            },
-            {
-                data: chartData.user_distribution.slice(0, 10),
-                type: 'bar',
-                title: 'Top 10 Users by Annotations',
-                xLabel: 'Users',
-                yLabel: 'Annotation Count'
-            },
-            {
-                data: chartData.project_distribution,
-                type: 'bar',
-                title: 'Project Progress',
-                xLabel: 'Projects',
-                yLabel: 'Annotation Count'
-            }
-        ];
-
-        for (const chartConfig of chartsToGenerate) {
-            if (chartConfig.data && chartConfig.data.length > 0) {
-                const chartImage = await generateChart(
-                    chartConfig.data,
-                    chartConfig.type,
-                    chartConfig.title,
-                    chartConfig.xLabel,
-                    chartConfig.yLabel
-                );
-                await addChartImage(chartImage, chartConfig.title);
-            }
-        }
-
-        // Key Insights Section
-        if (reportData.key_insights) {
-            doc.addPage();
-            y = 15;
-            addSectionHeader('KEY INSIGHTS & RECOMMENDATIONS');
-
-            const insights = reportData.key_insights;
-            
-            if (insights.top_performer) {
-                addSubSection('TOP PERFORMER');
-                addText(`🏆 ${insights.top_performer.username}: ${insights.top_performer.total_annotations} annotations`, 10, 'bold', margin);
-                y += lineHeight;
-            }
-
-            if (insights.most_common_mwe) {
-                addSubSection('MOST COMMON MWE');
-                addText(`📊 ${insights.most_common_mwe.mwe_type}: ${insights.most_common_mwe.count} occurrences`, 10, 'bold', margin);
-                y += lineHeight;
-            }
-
-            if (reportData.executive_summary?.recommendations) {
-                addSubSection('RECOMMENDATIONS');
-                reportData.executive_summary.recommendations.forEach((rec, index) => {
-                    addText(`${index + 1}. ${rec}`, 10, 'normal', margin);
-                    y += lineHeight;
-                });
-            }
-        }
-
-        // --- FOOTER ---
-        const totalPages = doc.getNumberOfPages();
-        for (let i = 1; i <= totalPages; i++) {
-            doc.setPage(i);
-            doc.setFontSize(8);
-            doc.setTextColor(128, 128, 128);
-            doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin - 20, pageHeight - 10);
-            doc.text(`Sentence Annotation System - ${new Date().toISOString().split('T')[0]}`, margin, pageHeight - 10);
-        }
-
-        // Save the PDF
-        const filename = `comprehensive_analytics_report_${new Date().toISOString().split('T')[0]}.pdf`;
-        doc.save(filename);
+        doc.setTextColor('#000000');
     };
 
+    const addSectionHeader = (text) => {
+        y += lineHeight;
+        doc.setFillColor(99, 102, 241); // Using your primary color
+        doc.rect(margin, y - 2, pageWidth - margin * 2, 8, 'F');
+        addText(text, 12, 'bold', margin + 5, 'left', '#ffffff');
+        y += lineHeight;
+    };
 
-    const renderPerformanceAnalytics = () => {
-    const userData = comprehensiveData?.user_performance || analyticsData?.user_distribution || [];
-    
-    return (
-        <Grid container spacing={3}>
-            <Grid item xs={12} md={8}>
-                <Paper 
-                    sx={{ 
-                        p: 3, 
-                        borderRadius: 3,
-                        height: '100%',
-                        minHeight: 520,
-                        display: 'flex',
-                        flexDirection: 'column'
-                    }}
-                    className="chart-container large-chart"
-                >
-                    <Typography variant="h6" fontWeight="700" gutterBottom>
-                        User Performance Distribution
-                    </Typography>
-                    <Box sx={{ flex: 1, minHeight: 400 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={userData.slice(0, 10)}>
-                                <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
-                                <XAxis 
-                                    dataKey="username" 
-                                    angle={-45} 
-                                    textAnchor="end" 
-                                    height={80}
-                                    tick={{ fill: theme.palette.text.secondary }}
-                                />
-                                <YAxis tick={{ fill: theme.palette.text.secondary }} />
-                                <RechartsTooltip 
-                                    contentStyle={{
-                                        background: theme.palette.background.paper,
-                                        border: `1px solid ${theme.palette.divider}`,
-                                        borderRadius: 8
-                                    }}
-                                />
-                                <Bar 
-                                    dataKey={userData[0]?.total_annotations ? 'total_annotations' : 'count'} 
-                                    fill={COLOR_PALETTE.primary}
-                                    radius={[4, 4, 0, 0]}
-                                    name="Total Annotations"
-                                />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </Box>
-                </Paper>
-            </Grid>
+    const addSubSection = (text) => {
+        y += lineHeight / 2;
+        addText(text, 11, 'bold', margin, 'left', '#2c3e50');
+        y += lineHeight / 2;
+    };
+
+    // Generate chart images
+    const generateChart = async (chartData, chartType, title, xLabel = '', yLabel = 'Count') => {
+        if (!chartData || chartData.length === 0) {
+            console.warn(`No data available for chart: ${title}`);
+            return null;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/analytics/generate-chart`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...getAuthHeaders()
+                },
+                body: JSON.stringify({
+                    type: chartType,
+                    data: chartData,
+                    title: title,
+                    x_label: xLabel,
+                    y_label: yLabel
+                })
+            });
             
-            <Grid item xs={12} md={4}>
-                <Paper 
-                    sx={{ 
-                        p: 3, 
-                        borderRadius: 3,
-                        height: '100%',
-                        minHeight: 520,
-                        display: 'flex',
-                        flexDirection: 'column'
-                    }}
-                    className="chart-container"
-                >
-                    <Typography variant="h6" fontWeight="700" gutterBottom>
-                        Performance Radar
-                    </Typography>
-                    <Box sx={{ flex: 1, minHeight: 400 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <RadarChart data={userData.slice(0, 5).map(user => ({
-                                subject: user.username,
-                                annotations: user.total_annotations || user.count,
-                                types: user.unique_mwe_count || user.mwe_type_count,
-                                fullMark: Math.max(...userData.map(u => u.total_annotations || u.count))
-                            }))}>
-                                <PolarGrid />
-                                <PolarAngleAxis dataKey="subject" />
-                                <PolarRadiusAxis />
-                                <Radar 
-                                    name="Annotations" 
-                                    dataKey="annotations" 
-                                    stroke={COLOR_PALETTE.primary} 
-                                    fill={COLOR_PALETTE.primary}
-                                    fillOpacity={0.6} 
-                                />
-                            </RadarChart>
-                        </ResponsiveContainer>
-                    </Box>
-                </Paper>
-            </Grid>
-        </Grid>
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    return result.image_data;
+                }
+            }
+            return null;
+        } catch (error) {
+            console.error('Error generating chart:', error);
+            return null;
+        }
+    };
+
+    const addChartImage = async (imageData, title, description = '') => {
+        if (y > pageHeight - 150) {
+            doc.addPage();
+            y = 15;
+        }
+        
+        if (!imageData) {
+            addText(`Chart unavailable: ${title}`, 10, 'italic', margin, 'center', '#e74c3c');
+            y += lineHeight;
+            return;
+        }
+
+        try {
+            addSubSection(title);
+            
+            const chartWidth = pageWidth - margin * 2;
+            const chartHeight = 120;
+            
+            doc.addImage(imageData, 'PNG', margin, y, chartWidth, chartHeight);
+            y += chartHeight + 10;
+            
+            if (description) {
+                addText(description, 9, 'normal', margin, 'left', '#7f8c8d');
+                y += lineHeight;
+            }
+            
+        } catch (error) {
+            console.error('Error adding chart image:', error);
+            addText(`Chart display failed: ${title}`, 10, 'italic', margin, 'center', '#e74c3c');
+            y += lineHeight;
+        }
+    };
+
+    // --- COVER PAGE ---
+    doc.setFillColor(99, 102, 241); // Primary color
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont('helvetica-bold', 'bold');
+    doc.text('ANALYTICS DASHBOARD REPORT', pageWidth / 2, 80, { align: 'center' });
+    
+    doc.setFontSize(16);
+    doc.text('Sentence Annotation System', pageWidth / 2, 100, { align: 'center' });
+    
+    doc.setFontSize(12);
+    doc.text(`Generated on: ${comprehensiveData?.report_metadata?.generated_at || new Date().toISOString()}`, pageWidth / 2, 120, { align: 'center' });
+    
+    doc.addPage();
+    y = 15;
+
+    // --- EXECUTIVE SUMMARY ---
+    addSectionHeader('EXECUTIVE SUMMARY');
+    
+    const summary = comprehensiveData?.executive_summary || comprehensiveData?.summary || {};
+    
+    // Key Metrics
+    const metrics = [
+        { label: 'Total Annotations', value: summary.total_annotations || mweData?.summary?.total_annotations || 0 },
+        { label: 'Active Users', value: summary.total_users || mweData?.summary?.total_users || 0 },
+        { label: 'Total Projects', value: projects?.length || 0 },
+        { label: 'MWE Types', value: summary.total_mwe_types || mweData?.summary?.total_mwe_types || 0 }
+    ];
+    
+    metrics.forEach(metric => {
+        addText(`• ${metric.label}: ${metric.value.toLocaleString()}`, 10, 'normal', margin);
+        y += lineHeight;
+    });
+
+    // --- OVERVIEW CHARTS ---
+    doc.addPage();
+    y = 15;
+    addSectionHeader('OVERVIEW CHARTS');
+
+    // 1. MWE Distribution Pie Chart
+    const mweChartData = mweData?.mwe_types?.slice(0, 8) || [];
+    const mwePieChart = await generateChart(
+        mweChartData,
+        'pie',
+        'MWE Type Distribution',
+        'MWE Types',
+        'Count'
     );
+    await addChartImage(mwePieChart, 'MWE Type Distribution', 'Distribution of Multi-Word Expression types across all annotations');
+
+    // 2. User Performance Bar Chart
+    const userPerformanceData = comprehensiveData?.user_performance?.slice(0, 10) || mweData?.user_distribution?.slice(0, 10) || [];
+    const userBarChart = await generateChart(
+        userPerformanceData,
+        'bar',
+        'Top Users by Annotations',
+        'Users',
+        'Annotation Count'
+    );
+    await addChartImage(userBarChart, 'User Performance', 'Top 10 users by total annotation count');
+
+    // 3. Timeline Area Chart
+    const timelineChart = await generateChart(
+        timelineData,
+        'line',
+        'Annotation Timeline',
+        'Date',
+        'Daily Annotations'
+    );
+    await addChartImage(timelineChart, 'Annotation Activity Timeline', 'Daily annotation activity over time');
+
+    // --- PROJECT ANALYTICS ---
+    doc.addPage();
+    y = 15;
+    addSectionHeader('PROJECT ANALYTICS');
+
+    // Project Progress Data
+    const projectData = projects.map(project => ({
+        name: project.name,
+        progress: project.progress_percent || 0,
+        total_sentences: project.total_sentences || 0,
+        annotated_count: project.annotated_count || 0
+    }));
+
+    // 4. Project Progress Bar Chart
+    const projectProgressChart = await generateChart(
+        projectData,
+        'bar',
+        'Project Progress Overview',
+        'Projects',
+        'Completion %'
+    );
+    await addChartImage(projectProgressChart, 'Project Progress', 'Completion percentage for each project');
+
+    // Project Statistics
+    addSubSection('Project Statistics');
+    const completedProjects = projectData.filter(p => p.progress === 100).length;
+    const inProgressProjects = projectData.filter(p => p.progress > 0 && p.progress < 100).length;
+    const notStartedProjects = projectData.filter(p => p.progress === 0).length;
+
+    addText(`• Total Projects: ${projectData.length}`, 10, 'normal', margin);
+    y += lineHeight;
+    addText(`• Completed: ${completedProjects}`, 10, 'normal', margin);
+    y += lineHeight;
+    addText(`• In Progress: ${inProgressProjects}`, 10, 'normal', margin);
+    y += lineHeight;
+    addText(`• Not Started: ${notStartedProjects}`, 10, 'normal', margin);
+    y += lineHeight;
+
+    // --- PERFORMANCE ANALYTICS ---
+    doc.addPage();
+    y = 15;
+    addSectionHeader('PERFORMANCE ANALYTICS');
+
+    // 5. Language Distribution
+    const languageData = mweData?.language_distribution?.slice(0, 10) || [];
+    const languageChart = await generateChart(
+        languageData,
+        'bar',
+        'Language Distribution',
+        'Languages',
+        'Annotation Count'
+    );
+    await addChartImage(languageChart, 'Language Distribution', 'Annotations distributed by language');
+
+    // Performance Metrics
+    addSubSection('Performance Metrics');
+    
+    const qualityMetrics = comprehensiveData?.quality_metrics || {};
+    if (Object.keys(qualityMetrics).length > 0) {
+        addText(`• User Engagement: ${qualityMetrics.user_engagement_score?.toFixed(1) || 'N/A'}%`, 10, 'normal', margin);
+        y += lineHeight;
+        addText(`• Growth Rate: ${qualityMetrics.annotation_growth_rate?.toFixed(1) || 'N/A'}%`, 10, 'normal', margin);
+        y += lineHeight;
+        addText(`• Quality Rating: ${qualityMetrics.overall_annotation_quality || 'N/A'}`, 10, 'normal', margin);
+        y += lineHeight;
+    }
+
+    // --- KEY INSIGHTS ---
+    doc.addPage();
+    y = 15;
+    addSectionHeader('KEY INSIGHTS & RECOMMENDATIONS');
+
+    const insights = comprehensiveData?.key_insights || {};
+
+    if (insights.top_performer) {
+        addSubSection('🏆 Top Performer');
+        addText(`${insights.top_performer.username}: ${insights.top_performer.total_annotations} annotations`, 10, 'bold', margin);
+        y += lineHeight;
+    }
+
+    if (insights.most_common_mwe) {
+        addSubSection('📊 Most Common MWE');
+        addText(`${insights.most_common_mwe.mwe_type}: ${insights.most_common_mwe.count} occurrences`, 10, 'bold', margin);
+        y += lineHeight;
+    }
+
+    if (insights.busiest_day) {
+        addSubSection('📈 Peak Activity');
+        addText(`Busiest day: ${insights.busiest_day.date} with ${insights.busiest_day.daily_annotations} annotations`, 10, 'bold', margin);
+        y += lineHeight;
+    }
+
+    // Recommendations
+    if (comprehensiveData?.executive_summary?.recommendations) {
+        addSubSection('💡 Recommendations');
+        comprehensiveData.executive_summary.recommendations.forEach((rec, index) => {
+            addText(`${index + 1}. ${rec}`, 10, 'normal', margin);
+            y += lineHeight;
+        });
+    }
+
+    // --- FOOTER ---
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(128, 128, 128);
+        doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin - 20, pageHeight - 10);
+        doc.text(`Analytics Dashboard - ${new Date().toISOString().split('T')[0]}`, margin, pageHeight - 10);
+    }
+
+    // Save the PDF
+    const filename = `analytics_dashboard_report_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(filename);
 };
 
-    const renderProjectAnalytics = () => {
-    const chartData = projects.map(project => ({
-        project_name: project.name,
-        total_annotations: project.annotated_count,
-        completion_rate: project.progress_percent,
-        total_sentences: project.total_sentences,
+
+  const renderPerformanceAnalytics = () => {
+  // CORRECTED: Use the right data structure from backend
+  const userData = comprehensiveData?.user_performance || analyticsData?.user_distribution || [];
+  
+  console.log("User Performance Data:", userData);
+  
+  // Prepare data for charts with proper fallbacks
+  const chartData = userData.slice(0, 10).map(user => ({
+    username: user.username || user._id || 'Unknown User',
+    total_annotations: user.total_annotations || user.count || 0,
+    unique_mwe_count: user.unique_mwe_count || user.mwe_type_count || 0,
+    productivity_score: user.productivity_score || 0,
+    completion_rate: user.approval_rate || 0
+  }));
+
+  // Prepare radar chart data
+  const radarData = userData.slice(0, 5).map(user => ({
+    subject: (user.username || user._id || 'User').substring(0, 12), // Truncate long names
+    annotations: user.total_annotations || user.count || 0,
+    diversity: user.unique_mwe_count || user.mwe_type_count || 0,
+    productivity: user.productivity_score || 0,
+    quality: user.approval_rate || 0
+  }));
+
+  // Calculate max values for radar chart
+  const maxAnnotations = Math.max(...radarData.map(d => d.annotations), 1);
+  const maxDiversity = Math.max(...radarData.map(d => d.diversity), 1);
+  const maxProductivity = Math.max(...radarData.map(d => d.productivity), 1);
+  const maxQuality = Math.max(...radarData.map(d => d.quality), 1);
+
+  const radarChartData = radarData.map(user => ({
+    ...user,
+    annotations: (user.annotations / maxAnnotations) * 100,
+    diversity: (user.diversity / maxDiversity) * 100,
+    productivity: (user.productivity / maxProductivity) * 100,
+    quality: user.quality // Already a percentage
+  }));
+
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 3,
+        width: "100%",
+      }}
+    >
+      {/* Left – User Performance Distribution */}
+      <Box
+        sx={{
+          flex: { xs: "1 1 100%", md: "1 1 48%" },
+          minWidth: { xs: "100%", md: "48%" },
+        }}
+      >
+        <Paper
+          className="chart-container"
+          sx={{
+            width: "100%",
+            height: 520,
+            display: "flex",
+            flexDirection: "column",
+            p: 2,
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            border: `1px solid ${theme.palette.divider}`,
+            borderRadius: 3,
+          }}
+        >
+          <Typography variant="h6" fontWeight="700" gutterBottom sx={{ mb: 2 }}>
+            📊 User Performance Distribution
+          </Typography>
+          <Box sx={{ flex: 1, minHeight: 400, width: '100%' }}>
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart 
+                  data={chartData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
+                >
+                  <CartesianGrid 
+                    strokeDasharray="3 3" 
+                    stroke={theme.palette.divider}
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="username"
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                    tick={{ 
+                      fontSize: 11, 
+                      fill: theme.palette.text.secondary,
+                      fontWeight: 500 
+                    }}
+                    interval={0}
+                  />
+                  <YAxis 
+                    tick={{ 
+                      fill: theme.palette.text.secondary,
+                      fontSize: 12 
+                    }}
+                    axisLine={{ stroke: theme.palette.divider }}
+                    tickLine={{ stroke: theme.palette.divider }}
+                  />
+                  <RechartsTooltip
+                    contentStyle={{
+                      background: theme.palette.background.paper,
+                      border: `1px solid ${theme.palette.divider}`,
+                      borderRadius: 8,
+                      boxShadow: theme.shadows[3],
+                      fontSize: '14px'
+                    }}
+                    formatter={(value, name) => {
+                      const formattedName = name === 'total_annotations' ? 'Total Annotations' : name;
+                      return [value, formattedName];
+                    }}
+                    labelFormatter={(label) => `User: ${label}`}
+                  />
+                  <Bar
+                    dataKey="total_annotations"
+                    fill={COLOR_PALETTE.primary}
+                    radius={[4, 4, 0, 0]}
+                    name="Total Annotations"
+                    maxBarSize={40}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                height: '100%',
+                flexDirection: 'column',
+                color: 'text.secondary'
+              }}>
+                <PeopleIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+                <Typography variant="body1" align="center">
+                  No user performance data available
+                </Typography>
+                <Typography variant="body2" align="center" sx={{ mt: 1 }}>
+                  User annotations will appear here once available
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </Paper>
+      </Box>
+
+      {/* Right – Performance Radar */}
+      <Box
+        sx={{
+          flex: { xs: "1 1 100%", md: "1 1 48%" },
+          minWidth: { xs: "100%", md: "48%" },
+        }}
+      >
+        <Paper
+          className="chart-container"
+          sx={{
+            width: "100%",
+            height: 520,
+            display: "flex",
+            flexDirection: "column",
+            p: 2,
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            border: `1px solid ${theme.palette.divider}`,
+            borderRadius: 3,
+          }}
+        >
+          <Typography variant="h6" fontWeight="700" gutterBottom sx={{ mb: 2 }}>
+            📈 Performance Radar
+          </Typography>
+          <Box sx={{ flex: 1, minHeight: 400, width: '100%' }}>
+            {radarChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart
+                  data={radarChartData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                >
+                  <PolarGrid 
+                    stroke={theme.palette.divider}
+                    strokeOpacity={0.6}
+                  />
+                  <PolarAngleAxis 
+                    dataKey="subject" 
+                    tick={{ 
+                      fill: theme.palette.text.secondary,
+                      fontSize: 11,
+                      fontWeight: 500 
+                    }}
+                  />
+                  <PolarRadiusAxis 
+                    angle={90}
+                    domain={[0, 100]}
+                    tick={{ 
+                      fill: theme.palette.text.secondary,
+                      fontSize: 10 
+                    }}
+                  />
+                  <RechartsTooltip
+                    contentStyle={{
+                      background: theme.palette.background.paper,
+                      border: `1px solid ${theme.palette.divider}`,
+                      borderRadius: 8,
+                      boxShadow: theme.shadows[3],
+                      fontSize: '14px'
+                    }}
+                    formatter={(value, name) => {
+                      const metricNames = {
+                        annotations: 'Annotations',
+                        diversity: 'MWE Diversity',
+                        productivity: 'Productivity',
+                        quality: 'Quality Score'
+                      };
+                      return [`${Number(value).toFixed(1)}%`, metricNames[name] || name];
+                    }}
+                  />
+                  {radarChartData.map((user, index) => (
+                    <Radar
+                      key={user.subject}
+                      name={user.subject}
+                      dataKey="annotations"
+                      stroke={[
+                        COLOR_PALETTE.primary,
+                        COLOR_PALETTE.secondary,
+                        COLOR_PALETTE.success,
+                        COLOR_PALETTE.warning,
+                        COLOR_PALETTE.error
+                      ][index % 5]}
+                      fill={[
+                        COLOR_PALETTE.primary,
+                        COLOR_PALETTE.secondary,
+                        COLOR_PALETTE.success,
+                        COLOR_PALETTE.warning,
+                        COLOR_PALETTE.error
+                      ][index % 5]}
+                      fillOpacity={0.2}
+                      strokeWidth={2}
+                    />
+                  ))}
+                </RadarChart>
+              </ResponsiveContainer>
+            ) : (
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                height: '100%',
+                flexDirection: 'column',
+                color: 'text.secondary'
+              }}>
+                <TrendingUpIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+                <Typography variant="body1" align="center">
+                  No radar chart data available
+                </Typography>
+                <Typography variant="body2" align="center" sx={{ mt: 1 }}>
+                  Need at least 2 users with annotations
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </Paper>
+      </Box>
+
+      {/* Performance Metrics Summary */}
+      <Box
+        sx={{
+          flex: "1 1 100%",
+          minWidth: "100%",
+        }}
+      >
+        <Paper
+          sx={{
+            p: 3,
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            border: `1px solid ${theme.palette.divider}`,
+          }}
+        >
+          <Typography variant="h6" fontWeight="700" gutterBottom>
+            🎯 Performance Metrics Summary
+          </Typography>
+          <Grid container spacing={2}>
+            {chartData.slice(0, 6).map((user, index) => (
+              <Grid item xs={12} sm={6} md={4} key={user.username}>
+                <Card 
+                  sx={{ 
+                    p: 2.5,
+                    background: `linear-gradient(135deg, ${
+                      [
+                        COLOR_PALETTE.primary, 
+                        COLOR_PALETTE.secondary, 
+                        COLOR_PALETTE.success,
+                        COLOR_PALETTE.warning, 
+                        COLOR_PALETTE.error, 
+                        COLOR_PALETTE.info
+                      ][index % 6]
+                    }08 0%, transparent 100%)`,
+                    border: `1px solid ${
+                      [
+                        COLOR_PALETTE.primary, 
+                        COLOR_PALETTE.secondary, 
+                        COLOR_PALETTE.success,
+                        COLOR_PALETTE.warning, 
+                        COLOR_PALETTE.error, 
+                        COLOR_PALETTE.info
+                      ][index % 6]
+                    }20`,
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      boxShadow: theme.shadows[4],
+                    }
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+                    <Avatar 
+                      sx={{ 
+                        width: 32, 
+                        height: 32,
+                        background: `linear-gradient(135deg, ${
+                          [
+                            COLOR_PALETTE.primary, 
+                            COLOR_PALETTE.secondary, 
+                            COLOR_PALETTE.success,
+                            COLOR_PALETTE.warning, 
+                            COLOR_PALETTE.error, 
+                            COLOR_PALETTE.info
+                          ][index % 6]
+                        } 0%, ${
+                          [
+                            COLOR_PALETTE.secondary, 
+                            COLOR_PALETTE.primary, 
+                            COLOR_PALETTE.info,
+                            COLOR_PALETTE.success, 
+                            COLOR_PALETTE.warning, 
+                            COLOR_PALETTE.error
+                          ][index % 6]
+                        } 100%)`,
+                        fontSize: '0.875rem',
+                        fontWeight: 'bold',
+                        mr: 1.5
+                      }}
+                    >
+                      {user.username.charAt(0).toUpperCase()}
+                    </Avatar>
+                    <Typography variant="subtitle1" fontWeight="600" noWrap>
+                      {user.username}
+                    </Typography>
+                  </Box>
+                  
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Annotations:
+                    </Typography>
+                    <Typography variant="body1" fontWeight="700">
+                      {user.total_annotations}
+                    </Typography>
+                  </Box>
+                  
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      MWE Types:
+                    </Typography>
+                    <Typography variant="body1" fontWeight="600">
+                      {user.unique_mwe_count}
+                    </Typography>
+                  </Box>
+                  
+                  {user.completion_rate > 0 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Completion:
+                      </Typography>
+                      <Chip 
+                        label={`${user.completion_rate}%`}
+                        size="small"
+                        sx={{
+                          background: user.completion_rate >= 80 
+                            ? `${COLOR_PALETTE.success}20` 
+                            : user.completion_rate >= 50 
+                            ? `${COLOR_PALETTE.warning}20`
+                            : `${COLOR_PALETTE.error}20`,
+                          color: user.completion_rate >= 80 
+                            ? COLOR_PALETTE.success 
+                            : user.completion_rate >= 50 
+                            ? COLOR_PALETTE.warning
+                            : COLOR_PALETTE.error,
+                          fontWeight: '600',
+                          fontSize: '0.75rem'
+                        }}
+                      />
+                    </Box>
+                  )}
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+          
+          {chartData.length === 0 && (
+            <Box sx={{ 
+              textAlign: 'center', 
+              py: 4,
+              color: 'text.secondary'
+            }}>
+              <PeopleIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+              <Typography variant="body1">
+                No user performance metrics available
+              </Typography>
+            </Box>
+          )}
+        </Paper>
+      </Box>
+    </Box>
+  );
+};
+
+
+
+const renderProjectAnalytics = () => {
+    const projectData = projects.map(project => ({
+        name: project.name,
+        progress: project.progress_percent || 0,
+        completed: project.annotated_count || 0,
+        total: project.total_sentences || 0,
         status: project.progress_percent === 100 ? 'Completed' : 'In Progress'
     }));
 
+    // Calculate summary stats
+    const completedProjects = projectData.filter(p => p.progress === 100).length;
+    const avgProgress = projectData.reduce((sum, p) => sum + p.progress, 0) / Math.max(projectData.length, 1);
+
     return (
         <Grid container spacing={3}>
+            {/* Quick Stats */}
             <Grid item xs={12}>
-                <Paper 
-                    sx={{ 
-                        p: 3, 
-                        borderRadius: 3,
-                        height: '100%',
-                        minHeight: 500,
-                        display: 'flex',
-                        flexDirection: 'column'
-                    }}
-                    className="chart-container large-chart"
-                >
+                <Grid container spacing={2}>
+                    <Grid item xs={6} sm={3}>
+                        <Paper sx={{ p: 2, textAlign: 'center' }}>
+                            <Typography variant="h4" fontWeight="800" color={COLOR_PALETTE.primary}>
+                                {projectData.length}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                Total Projects
+                            </Typography>
+                        </Paper>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                        <Paper sx={{ p: 2, textAlign: 'center' }}>
+                            <Typography variant="h4" fontWeight="800" color={COLOR_PALETTE.success}>
+                                {completedProjects}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                Completed
+                            </Typography>
+                        </Paper>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                        <Paper sx={{ p: 2, textAlign: 'center' }}>
+                            <Typography variant="h4" fontWeight="800" color={COLOR_PALETTE.warning}>
+                                {projectData.length - completedProjects}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                In Progress
+                            </Typography>
+                        </Paper>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                        <Paper sx={{ p: 2, textAlign: 'center' }}>
+                            <Typography variant="h4" fontWeight="800" color={COLOR_PALETTE.secondary}>
+                                {Math.round(avgProgress)}%
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                Avg Progress
+                            </Typography>
+                        </Paper>
+                    </Grid>
+                </Grid>
+            </Grid>
+
+            {/* Progress Chart */}
+            <Grid item xs={12} lg={8}>
+                <Paper sx={{ p: 3, borderRadius: 3 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Typography variant="h6" fontWeight="700">
+                            Project Progress
+                        </Typography>
+                        <Chip 
+                            label={`${projectData.length} projects`}
+                            size="small"
+                            variant="outlined"
+                        />
+                    </Box>
+                    <Box sx={{ height: 300 }}>
+                        {projectData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={projectData}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                                    <XAxis 
+                                        dataKey="name" 
+                                        angle={-45} 
+                                        textAnchor="end" 
+                                        height={60}
+                                        tick={{ fontSize: 11 }}
+                                    />
+                                    <YAxis />
+                                    <RechartsTooltip 
+                                        formatter={(value) => [`${value}%`, 'Progress']}
+                                    />
+                                    <Bar 
+                                        dataKey="progress" 
+                                        fill={COLOR_PALETTE.primary}
+                                        radius={[4, 4, 0, 0]}
+                                    >
+                                        {projectData.map((entry, index) => (
+                                            <Cell 
+                                                key={`cell-${index}`}
+                                                fill={
+                                                    entry.progress === 100 ? COLOR_PALETTE.success :
+                                                    entry.progress >= 50 ? COLOR_PALETTE.primary :
+                                                    COLOR_PALETTE.warning
+                                                }
+                                            />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <Box sx={{ 
+                                display: 'flex', 
+                                justifyContent: 'center', 
+                                alignItems: 'center', 
+                                height: '100%',
+                                color: 'text.secondary'
+                            }}>
+                                <Typography>No projects to display</Typography>
+                            </Box>
+                        )}
+                    </Box>
+                </Paper>
+            </Grid>
+
+            {/* Project List */}
+            <Grid item xs={12} lg={4}>
+                <Paper sx={{ p: 3, borderRadius: 3 }}>
                     <Typography variant="h6" fontWeight="700" gutterBottom>
-                        Project Progress Overview
+                        Recent Projects
                     </Typography>
-                    <Box sx={{ flex: 1, minHeight: 400 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
-                                <XAxis 
-                                    dataKey="project_name" 
-                                    angle={-45} 
-                                    textAnchor="end" 
-                                    height={80}
-                                    tick={{ fontSize: 12 }}
-                                />
-                                <YAxis />
-                                <RechartsTooltip 
-                                    contentStyle={{
-                                        background: theme.palette.background.paper,
-                                        border: `1px solid ${theme.palette.divider}`,
-                                        borderRadius: 8
+                    <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                        {projectData.slice(0, 8).map((project, index) => (
+                            <Box key={index} sx={{ mb: 2, pb: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                                    <Typography variant="body2" fontWeight="600" noWrap sx={{ flex: 1 }}>
+                                        {project.name}
+                                    </Typography>
+                                    <Typography variant="body2" fontWeight="700" color={
+                                        project.progress === 100 ? COLOR_PALETTE.success :
+                                        project.progress >= 50 ? COLOR_PALETTE.primary :
+                                        COLOR_PALETTE.warning
+                                    }>
+                                        {project.progress}%
+                                    </Typography>
+                                </Box>
+                                <LinearProgress 
+                                    variant="determinate" 
+                                    value={project.progress}
+                                    sx={{
+                                        height: 6,
+                                        borderRadius: 3,
+                                        backgroundColor: `${theme.palette.divider}30`,
+                                        '& .MuiLinearProgress-bar': {
+                                            backgroundColor: 
+                                                project.progress === 100 ? COLOR_PALETTE.success :
+                                                project.progress >= 50 ? COLOR_PALETTE.primary :
+                                                COLOR_PALETTE.warning,
+                                            borderRadius: 3
+                                        }
                                     }}
                                 />
-                                <Bar 
-                                    dataKey="total_annotations" 
-                                    fill={COLOR_PALETTE.primary}
-                                    name="Total Annotations"
-                                    radius={[4, 4, 0, 0]}
-                                />
-                                <Bar 
-                                    dataKey="completion_rate" 
-                                    fill={COLOR_PALETTE.success}
-                                    name="Completion Rate %"
-                                    radius={[4, 4, 0, 0]}
-                                />
-                            </BarChart>
-                        </ResponsiveContainer>
+                                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                                    {project.completed}/{project.total} sentences
+                                </Typography>
+                            </Box>
+                        ))}
+                        {projectData.length === 0 && (
+                            <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
+                                No projects available
+                            </Typography>
+                        )}
                     </Box>
                 </Paper>
             </Grid>
@@ -1191,105 +1664,236 @@ const AnalyticsDashboard = () => {
     );
 };
 
-    const renderMWEAnalytics = () => {
-    const mweData = analyticsData?.mwe_types || [];
-    
-    return (
-        <Grid container spacing={3}>
-            <Grid item xs={12} md={7}>
-                <Paper 
-                    sx={{ 
-                        p: 3, 
-                        borderRadius: 3,
-                        height: '100%',
-                        minHeight: 480,
-                        display: 'flex',
-                        flexDirection: 'column'
-                    }}
-                    className="chart-container"
+ const renderMWEAnalytics = () => {
+  // CORRECTED: Use the right data structure from backend
+  const mweData = analyticsData?.mwe_types || [];
+  const languageData = analyticsData?.language_distribution || [];
+  
+  console.log("MWE Data for charts:", mweData);
+  console.log("Language Data for charts:", languageData);
+
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 3,
+        width: "100%",
+      }}
+    >
+      {/* Left – MWE Type Distribution */}
+      <Box
+        sx={{
+          flex: { xs: "1 1 100%", md: "1 1 48%" },
+          minWidth: { xs: "100%", md: "48%" },
+        }}
+      >
+        <Paper
+          className="chart-container"
+          sx={{
+            width: "100%",
+            height: 520,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Typography variant="h6" fontWeight="700" gutterBottom>
+            MWE Type Distribution
+          </Typography>
+          <Box sx={{ width: "100%", height: 400 }}>
+            {mweData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={mweData.slice(0, 8)} // Show top 8 MWE types
+                    dataKey="count"
+                    nameKey="mwe_type"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={120}
+                    label={({ mwe_type, percent }) =>
+                      `${mwe_type} ${(percent * 100).toFixed(1)}%`
+                    }
+                    labelLine={true}
+                  >
+                    {mweData.map((_, i) => (
+                      <Cell
+                        key={i}
+                        fill={[
+                          "#6366F1",
+                          "#8B5CF6",
+                          "#10B981",
+                          "#F59E0B",
+                          "#EF4444",
+                          "#3B82F6",
+                          "#8B5CF6",
+                          "#06B6D4",
+                        ][i % 8]}
+                      />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip 
+                    formatter={(value, name) => [`${value} annotations`, name]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                height: '100%',
+                flexDirection: 'column',
+                color: 'text.secondary'
+              }}>
+                <AssessmentIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+                <Typography variant="body1">
+                  No MWE data available
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </Paper>
+      </Box>
+
+      {/* Right – Language Distribution */}
+      <Box
+        sx={{
+          flex: { xs: "1 1 100%", md: "1 1 48%" },
+          minWidth: { xs: "100%", md: "48%" },
+        }}
+      >
+        <Paper
+          className="chart-container"
+          sx={{
+            width: "100%",
+            height: 520,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <Typography variant="h6" fontWeight="700" gutterBottom>
+            Language Distribution
+          </Typography>
+          <Box sx={{ flex: 1, minHeight: 400 }}>
+            {languageData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart 
+                  data={languageData.slice(0, 10)}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
                 >
-                    <Typography variant="h6" fontWeight="700" gutterBottom>
-                        MWE Type Distribution
-                    </Typography>
-                    <Box sx={{ flex: 1, minHeight: 350 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={mweData.slice(0, 10)}>
-                                <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
-                                <XAxis 
-                                    dataKey="mwe_type" 
-                                    angle={-45} 
-                                    textAnchor="end" 
-                                    height={80}
-                                    tick={{ fill: theme.palette.text.secondary }}
-                                />
-                                <YAxis tick={{ fill: theme.palette.text.secondary }} />
-                                <RechartsTooltip 
-                                    contentStyle={{
-                                        background: theme.palette.background.paper,
-                                        border: `1px solid ${theme.palette.divider}`,
-                                        borderRadius: 8
-                                    }}
-                                />
-                                <Bar 
-                                    dataKey="count" 
-                                    fill={COLOR_PALETTE.secondary}
-                                    radius={[4, 4, 0, 0]}
-                                    name="Total Count"
-                                />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </Box>
-                </Paper>
-            </Grid>
-            
-            <Grid item xs={12} md={5}>
-                <Paper 
-                    sx={{ 
-                        p: 3, 
-                        borderRadius: 3,
-                        height: '100%',
-                        minHeight: 480,
-                        display: 'flex',
-                        flexDirection: 'column'
+                  <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                  <XAxis 
+                    dataKey="language" 
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                    tick={{ fontSize: 12, fill: theme.palette.text.secondary }}
+                  />
+                  <YAxis 
+                    tick={{ fill: theme.palette.text.secondary }}
+                  />
+                  <RechartsTooltip 
+                    formatter={(value) => [`${value} annotations`, 'Count']}
+                    contentStyle={{
+                      background: theme.palette.background.paper,
+                      border: `1px solid ${theme.palette.divider}`,
+                      borderRadius: 8,
                     }}
-                    className="chart-container"
+                  />
+                  <Bar
+                    dataKey="count"
+                    fill={COLOR_PALETTE.secondary}
+                    radius={[4, 4, 0, 0]}
+                    name="Annotations"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                height: '100%',
+                flexDirection: 'column',
+                color: 'text.secondary'
+              }}>
+                <LanguageIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+                <Typography variant="body1">
+                  No language data available
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </Paper>
+      </Box>
+
+      {/* Additional MWE Statistics */}
+      <Box
+        sx={{
+          flex: "1 1 100%",
+          minWidth: "100%",
+        }}
+      >
+        <Paper
+          sx={{
+            p: 3,
+            borderRadius: 3,
+          }}
+        >
+          <Typography variant="h6" fontWeight="700" gutterBottom>
+            MWE Statistics Summary
+          </Typography>
+          <Grid container spacing={2}>
+            {mweData.slice(0, 6).map((mwe, index) => (
+              <Grid item xs={12} sm={6} md={4} key={mwe.mwe_type}>
+                <Card 
+                  sx={{ 
+                    p: 2, 
+                    background: `linear-gradient(135deg, ${[
+                      "#6366F1", "#8B5CF6", "#10B981", 
+                      "#F59E0B", "#EF4444", "#3B82F6"
+                    ][index % 6]}20 0%, transparent 100%)`,
+                    border: `1px solid ${[
+                      "#6366F1", "#8B5CF6", "#10B981", 
+                      "#F59E0B", "#EF4444", "#3B82F6"
+                    ][index % 6]}30`
+                  }}
                 >
-                    <Typography variant="h6" fontWeight="700" gutterBottom>
-                        MWE Categories
-                    </Typography>
-                    <Box sx={{ flex: 1, minHeight: 350 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={mweData.slice(0, 6)}
-                                    cx="50%"
-                                    cy="50%"
-                                    labelLine={false}
-                                    label={({ mwe_type, count }) => `${mwe_type}: ${count}`}
-                                    outerRadius={80}
-                                    fill="#8884d8"
-                                    dataKey="count"
-                                >
-                                    {mweData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={[
-                                            COLOR_PALETTE.primary,
-                                            COLOR_PALETTE.secondary,
-                                            COLOR_PALETTE.success,
-                                            COLOR_PALETTE.warning,
-                                            COLOR_PALETTE.info,
-                                            COLOR_PALETTE.error
-                                        ][index % 6]} />
-                                    ))}
-                                </Pie>
-                                <RechartsTooltip />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </Box>
-                </Paper>
-            </Grid>
-        </Grid>
-    );
+                  <Typography variant="subtitle2" fontWeight="600" gutterBottom>
+                    {mwe.mwe_type}
+                  </Typography>
+                  <Typography variant="h6" fontWeight="700">
+                    {mwe.count} annotations
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {mwe.unique_word_count || 0} unique phrases
+                  </Typography>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+          {mweData.length === 0 && (
+            <Box sx={{ 
+              textAlign: 'center', 
+              py: 4,
+              color: 'text.secondary'
+            }}>
+              <Typography variant="body1">
+                No MWE statistics available
+              </Typography>
+            </Box>
+          )}
+        </Paper>
+      </Box>
+    </Box>
+  );
 };
+
+
     return (
         <Box className="analytics-dashboard" 
             sx={{ 

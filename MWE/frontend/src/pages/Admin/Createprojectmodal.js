@@ -75,7 +75,6 @@ export default function CreateProjectModal({ isOpen, onClose, adminUsername, onP
         onClose();
     };
 
-    // --- Submission Handler ---
     const handleSubmit = async (event) => {
         event.preventDefault();
         setError('');
@@ -92,10 +91,15 @@ export default function CreateProjectModal({ isOpen, onClose, adminUsername, onP
         formData.append('projectName', projectTitle.trim());
         formData.append('projectDescription', projectDescription.trim()); 
         formData.append('language', language);
-        
-        // NOTE: Assigning to the admin who creates it.
         formData.append('assignedUser', assignedUser); 
         formData.append('adminUsername', adminUsername);
+
+        // Debug: Log what we're sending
+        console.log('📤 Sending FormData with fields:');
+        for (let [key, value] of formData.entries()) {
+            console.log(`  ${key}:`, value);
+        }
+        console.log('🔐 Token being sent:', localStorage.getItem('jwt_token'));
 
         try {
             const response = await fetch('http://127.0.0.1:5001/api/projects', {
@@ -103,6 +107,16 @@ export default function CreateProjectModal({ isOpen, onClose, adminUsername, onP
                 headers: getAuthHeadersMultipart(),
                 body: formData,
             });
+
+            console.log('📦 Response status:', response.status, response.statusText);
+
+            // Check if it's an auth error first
+            if (response.status === 401 || response.status === 403) {
+                const errorText = await response.text();
+                console.error('🔒 Auth error details:', errorText);
+                setError('Authentication failed. Please try logging in again.');
+                return;
+            }
 
             const data = await response.json();
 

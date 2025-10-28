@@ -1,37 +1,126 @@
 /* ===============================================
-   ANALYTICS DASHBOARD - FIXED CHART SIZES
-   REMOVED FIXED HEIGHTS FOR BETTER READABILITY
+   ENHANCED ANALYTICS DASHBOARD - PREMIUM DESIGN
+   Modern, Clean, and Highly Professional
    =============================================== */
 
-/* ===== ROOT VARIABLES ===== */
+/* ===== CSS CUSTOM PROPERTIES ===== */
 :root {
-  --primary-gradient: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
-  --secondary-gradient: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);
-  --success-gradient: linear-gradient(135deg, #10B981 0%, #34D399 100%);
-  --warning-gradient: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%);
-  --info-gradient: linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);
+  /* Color Palette */
+  --primary: #6366F1;
+  --primary-dark: #4F46E5;
+  --primary-light: #818CF8;
+  --secondary: #8B5CF6;
+  --secondary-dark: #7C3AED;
+  --success: #10B981;
+  --success-light: #34D399;
+  --warning: #F59E0B;
+  --warning-light: #FBBF24;
+  --error: #EF4444;
+  --info: #3B82F6;
   
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  --gradient-secondary: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);
+  --gradient-success: linear-gradient(135deg, #10B981 0%, #34D399 100%);
+  --gradient-warning: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%);
+  --gradient-info: linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);
+  --gradient-premium: linear-gradient(135deg, #667EEA 0%, #764BA2 50%, #F093FB 100%);
+  --gradient-sunset: linear-gradient(135deg, #FA709A 0%, #FEE140 100%);
+  --gradient-ocean: linear-gradient(135deg, #667EEA 0%, #00C9FF 100%);
+  
+  /* Neutral Colors */
+  --gray-50: #F9FAFB;
+  --gray-100: #F3F4F6;
+  --gray-200: #E5E7EB;
+  --gray-300: #D1D5DB;
+  --gray-400: #9CA3AF;
+  --gray-500: #6B7280;
+  --gray-600: #4B5563;
+  --gray-700: #374151;
+  --gray-800: #1F2937;
+  --gray-900: #111827;
+  
+  /* Glass Morphism */
   --glass-bg: rgba(255, 255, 255, 0.95);
+  --glass-bg-hover: rgba(255, 255, 255, 0.98);
   --glass-border: rgba(255, 255, 255, 0.3);
-  --shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.12);
-  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.15);
-  --shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.18);
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+  
+  /* Shadows */
+  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.15);
+  --shadow-2xl: 0 24px 64px rgba(0, 0, 0, 0.18);
+  --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+  
+  /* Borders */
+  --border-radius-sm: 8px;
   --border-radius: 16px;
+  --border-radius-lg: 24px;
+  --border-radius-xl: 32px;
+  --border-width: 1px;
+  
+  /* Transitions */
+  --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+  
+  /* Typography */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+  --font-size-4xl: 2.25rem;
+  
+  /* Z-index layers */
+  --z-base: 1;
+  --z-elevated: 10;
+  --z-sticky: 100;
+  --z-overlay: 1000;
+  --z-modal: 10000;
+}
+
+/* ===== GLOBAL RESET & BASE STYLES ===== */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 /* ===== MAIN DASHBOARD CONTAINER ===== */
 .analytics-dashboard {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
+  background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 50%, #E2E8F0 100%);
   background-attachment: fixed;
+  font-family: var(--font-family);
+  color: var(--gray-900);
   position: relative;
   overflow-x: hidden;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Enhanced background pattern */
+/* Animated Background Pattern */
 .analytics-dashboard::before {
   content: '';
   position: fixed;
@@ -40,407 +129,45 @@
   width: 100%;
   height: 100%;
   background-image: 
-    radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.05) 0%, transparent 35%),
-    radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.05) 0%, transparent 35%),
-    radial-gradient(circle at 30% 90%, rgba(16, 185, 129, 0.03) 0%, transparent 35%),
-    radial-gradient(circle at 70% 10%, rgba(245, 158, 11, 0.03) 0%, transparent 35%);
+    radial-gradient(circle at 15% 25%, rgba(99, 102, 241, 0.06) 0%, transparent 40%),
+    radial-gradient(circle at 85% 75%, rgba(139, 92, 246, 0.06) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.04) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
-  animation: floatBackground 20s ease-in-out infinite;
+  animation: floatBackground 25s ease-in-out infinite;
 }
 
-/* ===== FLEXIBLE CHART CONTAINERS ===== */
-.chart-container {
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow-lg);
-  transition: var(--transition);
-  overflow: hidden;
-  position: relative;
-  animation: slideUpFade 0.6s ease-out backwards;
-  min-height: 400px; /* Reasonable minimum height */
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-}
-
-
-.chart-container.large-chart {
-  min-height: 450px;
-  height: auto !important;
-}
-
-
-/* Charts will now be responsive and fill available space */
-
-.chart-container::before {
+/* Subtle Grid Pattern */
+.analytics-dashboard::after {
   content: '';
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  height: 4px;
-  background: var(--primary-gradient);
-  background-size: 200% 100%;
-  animation: gradientFlow 3s ease infinite;
-  z-index: 2;
-}
-
-.chart-container:hover {
-  box-shadow: var(--shadow-xl);
-  transform: translateY(-4px);
-  border-color: rgba(99, 102, 241, 0.3);
-}
-
-/* ===== CHART TITLES ===== */
-.chart-container h6 {
-  color: #111827;
-  font-weight: 700;
-  font-size: 1.3rem !important;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid #F3F4F6;
-  position: relative;
-  line-height: 1.3;
-  flex-shrink: 0; /* Prevent title from shrinking */
-}
-
-.chart-container h6::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  width: 50px;
-  height: 3px;
-  background: var(--primary-gradient);
-  transition: width 0.3s ease;
-  border-radius: 2px;
-}
-
-.chart-container:hover h6::after {
-  width: 100px;
-}
-
-/* ===== ENHANCED CHART TEXT SIZES ===== */
-
-/* Axis labels */
-.recharts-cartesian-axis-tick-value {
-  fill: #6B7280 !important;
-  font-size: 13px !important;
-  font-weight: 600 !important;
-  font-family: 'Inter', sans-serif !important;
-}
-
-.recharts-polar-angle-axis-tick-value {
-  fill: #6B7280 !important;
-  font-size: 12px !important;
-  font-weight: 600 !important;
-  font-family: 'Inter', sans-serif !important;
-}
-
-.recharts-polar-radius-axis-tick-value {
-  fill: #6B7280 !important;
-  font-size: 11px !important;
-  font-weight: 600 !important;
-}
-
-/* Chart labels */
-.recharts-text {
-  fill: #374151 !important;
-  font-family: 'Inter', sans-serif !important;
-  font-weight: 600 !important;
-  font-size: 13px !important;
-}
-
-/* Legend text */
-.recharts-legend-item-text {
-  color: #374151 !important;
-  font-weight: 600 !important;
-  font-size: 13px !important;
-  font-family: 'Inter', sans-serif !important;
-}
-
-/* Tooltip text */
-.recharts-tooltip-item {
-  font-size: 13px !important;
-  font-family: 'Inter', sans-serif !important;
-  font-weight: 600 !important;
-}
-
-.recharts-tooltip-item-name {
-  font-weight: 600 !important;
-}
-
-.recharts-tooltip-item-value {
-  font-weight: 700 !important;
-}
-
-/* ===== CRITICAL FIXES FOR GRAPH VISIBILITY ===== */
-
-/* Ensure charts are visible and properly styled */
-.recharts-wrapper {
-  font-family: 'Inter', sans-serif !important;
-  flex: 1 !important; /* This makes the chart fill available space */
-  min-height: 300px; /* Ensure minimum chart height */
-}
-
-.recharts-surface {
-  border-radius: 12px;
-}
-
-/* Fix chart grid lines */
-.recharts-cartesian-grid-horizontal line,
-.recharts-cartesian-grid-vertical line {
-  stroke: #E5E7EB !important;
-  stroke-dasharray: 3 3 !important;
-  stroke-opacity: 0.7 !important;
-}
-
-.recharts-polar-grid line {
-  stroke: #E5E7EB !important;
-  stroke-opacity: 0.7 !important;
-}
-
-/* ===== SPECIFIC CHART ENHANCEMENTS ===== */
-
-/* Bar Charts */
-.recharts-bar-rectangle {
-  rx: 6 !important;
-  ry: 6 !important;
-  transition: all 0.3s ease !important;
-}
-
-.recharts-bar-chart .recharts-bar {
-  bar-size: 28 !important;
-}
-
-.recharts-bar-rectangle:hover {
-  opacity: 0.8 !important;
-  transform: scale(1.05) !important;
-}
-
-/* Pie Charts */
-.recharts-pie-sector {
-  stroke: white !important;
-  stroke-width: 2px !important;
-  transition: all 0.3s ease !important;
-}
-
-.recharts-pie-sector:hover {
-  stroke-width: 3px !important;
-  opacity: 0.9 !important;
-}
-
-.recharts-pie-label-text {
-  font-size: 13px !important;
-  font-weight: 700 !important;
-  fill: #111827 !important;
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8) !important;
-}
-
-.recharts-pie-label-line {
-  stroke: #6B7280 !important;
-  stroke-width: 1px !important;
-}
-
-/* Radar Charts */
-.recharts-radar-polygon {
-  stroke-width: 2px !important;
-}
-
-.recharts-polar-radius-axis-tick-value {
-  font-size: 11px !important;
-  font-weight: 600 !important;
-}
-
-.recharts-radar-dot {
-  r: 4 !important;
-  transition: all 0.3s ease !important;
-}
-
-.recharts-radar-dot:hover {
-  r: 6 !important;
-  stroke-width: 2px !important;
-}
-
-/* Line Charts */
-.recharts-line-curve {
-  stroke-width: 2px !important;
-  stroke-linecap: round !important;
-}
-
-.recharts-line-dots circle {
-  r: 4 !important;
-  transition: all 0.3s ease !important;
-}
-
-.recharts-line-dots circle:hover {
-  r: 6 !important;
-  stroke-width: 2px !important;
-}
-
-/* Area Charts */
-.recharts-area-area {
-  opacity: 0.6 !important;
-}
-
-.recharts-area-curve {
-  stroke-width: 2px !important;
-}
-
-/* ===== ENHANCED TOOLTIP ===== */
-.recharts-tooltip-wrapper {
-  z-index: 1000 !important;
-}
-
-.custom-recharts-tooltip {
-  background: rgba(255, 255, 255, 0.98) !important;
-  backdrop-filter: blur(20px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.8) !important;
-  border-radius: 12px !important;
-  box-shadow: var(--shadow-xl) !important;
-  padding: 16px !important;
-  animation: tooltipSlideIn 0.2s ease-out !important;
-}
-
-.custom-recharts-tooltip .tooltip-label {
-  color: #111827 !important;
-  font-weight: 700 !important;
-  font-size: 0.9rem !important;
-  margin-bottom: 6px !important;
-}
-
-.custom-recharts-tooltip .tooltip-value {
-  color: #6366F1 !important;
-  font-weight: 800 !important;
-  font-size: 1.1rem !important;
-}
-
-/* ===== ENHANCED STAT CARDS ===== */
-.stat-card {
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  border-radius: var(--border-radius);
-  transition: var(--transition);
-  box-shadow: var(--shadow-md);
-  position: relative;
-  overflow: hidden;
-  cursor: pointer;
-  animation: slideUpFade 0.6s ease-out backwards;
-  min-height: 140px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: var(--primary-gradient);
-  background-size: 200% 100%;
-  animation: gradientFlow 3s ease infinite;
-}
-
-.stat-card::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--primary-gradient);
-  opacity: 0;
-  transition: var(--transition);
-  z-index: 0;
-}
-
-.stat-card:hover::after {
-  opacity: 0.03;
-}
-
-.stat-card:hover {
-  transform: translateY(-6px);
-  box-shadow: var(--shadow-xl);
-  border-color: rgba(99, 102, 241, 0.4);
-}
-
-/* Stat card content */
-.stat-card .MuiCardContent-root {
-  position: relative;
-  z-index: 1;
-  padding: 20px !important;
-}
-
-.stat-card h4 {
-  background: var(--primary-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  font-weight: 800;
-  font-size: 2.2rem;
-  margin-bottom: 8px;
-  line-height: 1;
-}
-
-.stat-card .MuiTypography-body2 {
-  color: #6B7280;
-  font-weight: 600;
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
-}
-
-.stat-card .MuiTypography-caption {
-  color: #9CA3AF;
-  font-weight: 500;
-  font-size: 0.75rem;
-}
-
-/* ===== NETWORK GRAPH CONTAINER ===== */
-.network-graph-container {
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
-  position: relative;
-  animation: slideUpFade 0.8s ease-out backwards;
-  min-height: 450px;
-  padding: 20px;
-}
-
-.network-graph-container::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: 
-    radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.05) 0%, transparent 50%),
-    radial-gradient(circle at 80% 70%, rgba(139, 92, 246, 0.05) 0%, transparent 50%);
+  width: 100%;
+  height: 100%;
+  background-image: 
+    linear-gradient(rgba(99, 102, 241, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 102, 241, 0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
   pointer-events: none;
   z-index: 0;
+  opacity: 0.5;
 }
 
-/* ===== HEADER STYLING ===== */
+/* ===== ENHANCED HEADER ===== */
 .dashboard-header {
   background: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow-lg);
-  padding: 28px;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.8);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-xl);
+  padding: var(--spacing-2xl);
   position: relative;
   overflow: hidden;
   animation: slideDown 0.6s ease-out;
-  margin-bottom: 20px;
+  margin-bottom: var(--spacing-lg);
+  transition: var(--transition);
 }
 
 .dashboard-header::before {
@@ -449,232 +176,595 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 4px;
-  background: var(--primary-gradient);
+  height: 5px;
+  background: var(--gradient-primary);
   background-size: 200% 100%;
-  animation: gradientFlow 3s ease infinite;
+  animation: gradientFlow 4s ease infinite;
+}
+
+.dashboard-header::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.05) 0%, transparent 70%);
+  pointer-events: none;
+  animation: rotateGlow 20s linear infinite;
+}
+
+.dashboard-header:hover {
+  box-shadow: var(--shadow-2xl);
+  transform: translateY(-2px);
 }
 
 .dashboard-header h4 {
-  background: var(--primary-gradient);
+  background: var(--gradient-primary);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   font-weight: 800;
-  font-size: 2rem;
-  margin-bottom: 8px;
+  font-size: var(--font-size-4xl);
+  margin-bottom: var(--spacing-sm);
   line-height: 1.2;
+  letter-spacing: -0.02em;
+  position: relative;
+  z-index: 1;
 }
 
 .dashboard-header .MuiTypography-body1 {
-  color: #6B7280;
-  font-size: 1rem;
+  color: var(--gray-600);
+  font-size: var(--font-size-lg);
   font-weight: 500;
-  line-height: 1.5;
+  line-height: 1.6;
+  position: relative;
+  z-index: 1;
+}
+
+/* ===== ENHANCED STAT CARDS ===== */
+.stat-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: var(--transition);
+  animation: slideUpFade 0.6s ease-out backwards;
+  min-height: 160px;
+}
+
+/* Accent Bar at Top */
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--gradient-primary);
+  background-size: 200% 100%;
+  animation: gradientFlow 4s ease infinite;
+  z-index: 2;
+}
+
+/* Hover Gradient Overlay */
+.stat-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-primary);
+  opacity: 0;
+  transition: var(--transition);
+  z-index: 0;
+}
+
+.stat-card:hover::after {
+  opacity: 0.04;
+}
+
+.stat-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: var(--shadow-2xl);
+  border-color: rgba(99, 102, 241, 0.5);
+}
+
+/* Stat Card Content */
+.stat-card .MuiCardContent-root {
+  position: relative;
+  z-index: 1;
+  padding: var(--spacing-lg) !important;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.stat-card h3,
+.stat-card h4 {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 800;
+  font-size: var(--font-size-4xl);
+  line-height: 1;
+  margin-bottom: var(--spacing-sm);
+  letter-spacing: -0.02em;
+}
+
+.stat-card .MuiTypography-body2 {
+  color: var(--gray-600);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--spacing-xs);
+}
+
+.stat-card .MuiTypography-caption {
+  color: var(--gray-500);
+  font-weight: 500;
+  font-size: var(--font-size-xs);
+}
+
+.stat-card .MuiAvatar-root {
+  width: 56px;
+  height: 56px;
+  background: var(--gradient-primary);
+  box-shadow: var(--shadow-md);
+  transition: var(--transition);
+}
+
+.stat-card:hover .MuiAvatar-root {
+  transform: scale(1.1) rotate(5deg);
+  box-shadow: var(--shadow-xl);
+}
+
+/* ===== CHART CONTAINERS ===== */
+.chart-container {
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  padding: var(--spacing-lg);
+  position: relative;
+  overflow: hidden;
+   width: 100%;
+  transition: var(--transition);
+  animation: slideUpFade 0.7s ease-out backwards;
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-container.large-chart {
+  min-height: 480px;
+}
+
+/* Accent Bar */
+.chart-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--gradient-primary);
+  background-size: 200% 100%;
+  animation: gradientFlow 4s ease infinite;
+  z-index: 2;
+}
+
+.chart-container:hover {
+  box-shadow: var(--shadow-2xl);
+  transform: translateY(-4px);
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+/* Chart Titles */
+.chart-container h6,
+.chart-container .MuiTypography-h6 {
+  color: var(--gray-900);
+  font-weight: 700;
+  font-size: var(--font-size-xl) !important;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 2px solid var(--gray-100);
+  position: relative;
+  line-height: 1.3;
+  flex-shrink: 0;
+  letter-spacing: -0.01em;
+}
+
+.chart-container h6::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 60px;
+  height: 3px;
+  background: var(--gradient-primary);
+  border-radius: var(--border-radius-sm);
+  transition: var(--transition);
+}
+
+.chart-container:hover h6::after {
+  width: 120px;
+}
+
+/* ===== RECHARTS ENHANCEMENTS ===== */
+.recharts-wrapper {
+  font-family: var(--font-family) !important;
+  flex: 1;
+  min-height: 320px;
+}
+
+.recharts-surface {
+  border-radius: var(--border-radius-sm);
+}
+
+/* Axis Labels */
+.recharts-cartesian-axis-tick-value {
+  fill: var(--gray-600) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  font-family: var(--font-family) !important;
+}
+
+.recharts-polar-angle-axis-tick-value {
+  fill: var(--gray-600) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  font-family: var(--font-family) !important;
+}
+
+.recharts-polar-radius-axis-tick-value {
+  fill: var(--gray-500) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}
+
+/* Chart Text */
+.recharts-text {
+  fill: var(--gray-700) !important;
+  font-family: var(--font-family) !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+}
+
+/* Legend */
+.recharts-legend-item-text {
+  color: var(--gray-700) !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  font-family: var(--font-family) !important;
+}
+
+.recharts-default-legend {
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(12px) !important;
+  border-radius: var(--border-radius-sm) !important;
+  padding: var(--spacing-md) !important;
+  margin-top: var(--spacing-md) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* Grid Lines */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: var(--gray-200) !important;
+  stroke-dasharray: 3 3 !important;
+  stroke-opacity: 0.8 !important;
+}
+
+.recharts-polar-grid line {
+  stroke: var(--gray-200) !important;
+  stroke-opacity: 0.7 !important;
+}
+
+/* Bar Charts */
+.recharts-bar-rectangle {
+  rx: 8 !important;
+  ry: 8 !important;
+  transition: var(--transition-fast) !important;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.08));
+}
+
+.recharts-bar-rectangle:hover {
+  opacity: 0.85 !important;
+  transform: scale(1.05) !important;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
+}
+
+/* Pie Charts */
+.recharts-pie-sector {
+  stroke: white !important;
+  stroke-width: 3px !important;
+  transition: var(--transition) !important;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.1));
+}
+
+.recharts-pie-sector:hover {
+  stroke-width: 4px !important;
+  opacity: 0.9 !important;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
+}
+
+.recharts-pie-label-text {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  fill: var(--gray-900) !important;
+  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.9) !important;
+}
+
+.recharts-pie-label-line {
+  stroke: var(--gray-600) !important;
+  stroke-width: 2px !important;
+}
+
+/* Radar Charts */
+.recharts-radar-polygon {
+  stroke-width: 2.5px !important;
+  filter: drop-shadow(0 2px 8px rgba(99, 102, 241, 0.2));
+}
+
+.recharts-radar-dot {
+  r: 5 !important;
+  transition: var(--transition) !important;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.recharts-radar-dot:hover {
+  r: 7 !important;
+  stroke-width: 3px !important;
+}
+
+/* Line Charts */
+.recharts-line-curve {
+  stroke-width: 3px !important;
+  stroke-linecap: round !important;
+  filter: drop-shadow(0 2px 6px rgba(99, 102, 241, 0.3));
+}
+
+.recharts-line-dots circle {
+  r: 5 !important;
+  transition: var(--transition) !important;
+  stroke-width: 3px !important;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.recharts-line-dots circle:hover {
+  r: 7 !important;
+  stroke-width: 4px !important;
+}
+
+/* Area Charts */
+.recharts-area-area {
+  opacity: 0.7 !important;
+}
+
+.recharts-area-curve {
+  stroke-width: 3px !important;
+  filter: drop-shadow(0 2px 6px rgba(99, 102, 241, 0.3));
+}
+
+/* Tooltips */
+.recharts-tooltip-wrapper {
+  z-index: var(--z-overlay) !important;
+  filter: none !important;
+}
+
+.recharts-default-tooltip {
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.9) !important;
+  border-radius: var(--border-radius-sm) !important;
+  box-shadow: var(--shadow-2xl) !important;
+  padding: var(--spacing-md) !important;
+  animation: tooltipSlideIn 0.2s ease-out !important;
+}
+
+.recharts-tooltip-item {
+  font-size: 13px !important;
+  font-family: var(--font-family) !important;
+  font-weight: 600 !important;
+  color: var(--gray-700) !important;
+  padding: 4px 0 !important;
+}
+
+.recharts-tooltip-item-name {
+  font-weight: 600 !important;
+  margin-right: var(--spacing-sm) !important;
+}
+
+.recharts-tooltip-item-value {
+  font-weight: 700 !important;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.recharts-tooltip-label {
+  color: var(--gray-900) !important;
+  font-weight: 700 !important;
+  font-size: 14px !important;
+  margin-bottom: var(--spacing-xs) !important;
+  padding-bottom: var(--spacing-xs) !important;
+  border-bottom: 2px solid var(--gray-200) !important;
 }
 
 /* ===== TABS ENHANCEMENT ===== */
 .analytics-tabs {
   background: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(180%);
-  border-radius: var(--border-radius) var(--border-radius) 0 0;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--border-radius);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  border-bottom: none;
   position: relative;
-  z-index: 10;
-  margin-bottom: 20px;
+  z-index: var(--z-elevated);
+  margin-bottom: var(--spacing-lg);
+  animation: slideDown 0.5s ease-out;
+}
+
+.analytics-tabs .MuiTabs-root {
+  min-height: 64px;
 }
 
 .analytics-tabs .MuiTab-root {
   font-weight: 600;
   text-transform: none;
-  font-size: 0.95rem;
-  min-height: 60px;
+  font-size: var(--font-size-base);
+  min-height: 64px;
   transition: var(--transition);
-  color: #6B7280;
+  color: var(--gray-600);
   position: relative;
   overflow: hidden;
-  padding: 14px 20px;
+  padding: var(--spacing-md) var(--spacing-lg);
+  font-family: var(--font-family);
+}
+
+.analytics-tabs .MuiTab-root::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-primary);
+  opacity: 0;
+  transition: var(--transition);
+  z-index: 0;
+}
+
+.analytics-tabs .MuiTab-root:hover::before {
+  opacity: 0.05;
 }
 
 .analytics-tabs .MuiTab-root:hover {
-  color: #6366F1;
-  background: rgba(99, 102, 241, 0.04);
+  color: var(--primary);
 }
 
 .analytics-tabs .Mui-selected {
-  color: #6366F1 !important;
+  color: var(--primary) !important;
   font-weight: 700;
-  background: rgba(99, 102, 241, 0.08);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%);
 }
 
 .analytics-tabs .MuiTabs-indicator {
-  background: var(--primary-gradient);
-  height: 3px;
-  border-radius: 3px 3px 0 0;
+  background: var(--gradient-primary);
+  height: 4px;
+  border-radius: 4px 4px 0 0;
+  box-shadow: 0 -2px 8px rgba(99, 102, 241, 0.4);
 }
 
 .analytics-tabs .MuiTab-root .MuiSvgIcon-root {
-  margin-right: 8px;
-  font-size: 1.2rem;
+  margin-right: var(--spacing-sm);
+  font-size: 1.3rem;
+  transition: var(--transition);
 }
 
-/* ===== RESPONSIVE DESIGN ===== */
-
-@media (max-width: 1200px) {
-  :root {
-    --border-radius: 14px;
-  }
-  
-  .chart-container {
-    min-height: 380px;
-    padding: 18px;
-  }
-  
-  .chart-container.large-chart {
-    min-height: 420px;
-    padding: 20px;
-  }
-  
-  .chart-container h6 {
-    font-size: 1.2rem !important;
-  }
-  
-  .stat-card h4 {
-    font-size: 2rem;
-  }
+.analytics-tabs .Mui-selected .MuiSvgIcon-root {
+  transform: scale(1.1);
 }
 
-@media (max-width: 768px) {
-  :root {
-    --border-radius: 12px;
-  }
-
-  .analytics-dashboard {
-    padding: 12px !important;
-  }
-  
-  .dashboard-header {
-    padding: 20px !important;
-  }
-  
-  .dashboard-header h4 {
-    font-size: 1.6rem;
-  }
-  
-  .chart-container {
-    min-height: 350px;
-    padding: 16px;
-  }
-  
-  .chart-container.large-chart {
-    min-height: 380px;
-    padding: 18px;
-  }
-  
-  .chart-container h6 {
-    font-size: 1.1rem !important;
-    margin-bottom: 16px;
-  }
-  
-  .stat-card h4 {
-    font-size: 1.8rem;
-  }
-  
-  .analytics-tabs .MuiTab-root {
-    min-height: 56px;
-    font-size: 0.9rem;
-    padding: 12px 16px;
-  }
-  
-  /* Improve chart visibility on mobile */
-  .recharts-wrapper {
-    min-height: 250px;
-  }
-  
-  .recharts-cartesian-axis-tick-value {
-    font-size: 11px !important;
-  }
-  
-  .recharts-text {
-    font-size: 11px !important;
-  }
+/* ===== BUTTONS & CONTROLS ===== */
+.MuiButton-root {
+  border-radius: var(--border-radius-sm);
+  text-transform: none;
+  font-weight: 600;
+  font-family: var(--font-family);
+  transition: var(--transition);
+  box-shadow: var(--shadow-sm);
 }
 
-@media (max-width: 480px) {
-  .dashboard-header h4 {
-    font-size: 1.4rem;
-  }
-  
-  .chart-container {
-    min-height: 320px;
-    padding: 14px;
-  }
-  
-  .chart-container.large-chart {
-    min-height: 350px;
-    padding: 16px;
-  }
-  
-  .chart-container h6 {
-    font-size: 1rem !important;
-    margin-bottom: 14px;
-  }
-  
-  .stat-card h4 {
-    font-size: 1.6rem;
-  }
-  
-  .analytics-tabs .MuiTab-root {
-    min-height: 52px;
-    font-size: 0.85rem;
-    padding: 10px 12px;
-  }
-  
-  .recharts-cartesian-axis-tick-value {
-    font-size: 10px !important;
-  }
-  
-  .recharts-text {
-    font-size: 10px !important;
-  }
+.MuiButton-root:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
 
-/* ===== GRID LAYOUT ENHANCEMENTS ===== */
+.MuiButton-contained {
+  background: var(--gradient-primary);
+  color: white;
+}
 
-/* Ensure charts in grid take full available space */
-.MuiGrid-item .chart-container {
-  width: 100%;
-  height: 100%;
+.MuiButton-contained:hover {
+  background: var(--gradient-primary);
+  filter: brightness(1.1);
+}
+
+.MuiIconButton-root {
+  transition: var(--transition);
+}
+
+.MuiIconButton-root:hover {
+  transform: scale(1.1);
+}
+
+/* ===== ALERTS & NOTIFICATIONS ===== */
+.MuiAlert-root {
+  border-radius: var(--border-radius-sm);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-md);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.5);
+  animation: slideDown 0.4s ease-out;
+}
+
+/* ===== LOADING STATES ===== */
+.chart-loading {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 350px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  border-radius: var(--border-radius);
 }
 
-.MuiGrid-container .MuiGrid-item {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+.MuiCircularProgress-root {
+  color: var(--primary);
 }
 
-.MuiGrid-container .MuiGrid-item > .chart-container {
-  flex: 1;
-  min-height: 0;
+/* ===== SCROLLBAR STYLING ===== */
+.analytics-dashboard ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
 }
 
-.recharts-responsive-container {
-  width: 100% !important;
-  height: 100% !important;
-  flex: 1 !important;
-  min-height: 300px;
+.analytics-dashboard ::-webkit-scrollbar-track {
+  background: var(--gray-100);
+  border-radius: var(--border-radius-sm);
+}
+
+.analytics-dashboard ::-webkit-scrollbar-thumb {
+  background: var(--gradient-primary);
+  border-radius: var(--border-radius-sm);
+  border: 2px solid var(--gray-100);
+}
+
+.analytics-dashboard ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--secondary-dark) 100%);
+}
+
+/* Firefox Scrollbar */
+.analytics-dashboard {
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) var(--gray-100);
 }
 
 /* ===== ANIMATIONS ===== */
 @keyframes slideUpFade {
   from {
     opacity: 0;
-    transform: translateY(30px) scale(0.95);
+    transform: translateY(40px) scale(0.95);
   }
   to {
     opacity: 1;
@@ -685,7 +775,7 @@
 @keyframes slideDown {
   from {
     opacity: 0;
-    transform: translateY(-20px) scale(0.98);
+    transform: translateY(-30px) scale(0.95);
   }
   to {
     opacity: 1;
@@ -694,19 +784,36 @@
 }
 
 @keyframes gradientFlow {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
+  0%, 100% { 
+    background-position: 0% 50%; 
+  }
+  50% { 
+    background-position: 100% 50%; 
+  }
 }
 
 @keyframes floatBackground {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-10px) rotate(1deg); }
+  0%, 100% { 
+    transform: translateY(0) rotate(0deg); 
+  }
+  50% { 
+    transform: translateY(-15px) rotate(2deg); 
+  }
+}
+
+@keyframes rotateGlow {
+  0% { 
+    transform: rotate(0deg); 
+  }
+  100% { 
+    transform: rotate(360deg); 
+  }
 }
 
 @keyframes tooltipSlideIn {
   from {
     opacity: 0;
-    transform: scale(0.9) translateY(-5px);
+    transform: scale(0.9) translateY(-10px);
   }
   to {
     opacity: 1;
@@ -714,47 +821,284 @@
   }
 }
 
-@keyframes chartScaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(20px);
-  }
-  to {
+@keyframes pulse {
+  0%, 100% {
     opacity: 1;
-    transform: scale(1) translateY(0);
+  }
+  50% {
+    opacity: 0.7;
   }
 }
 
-.chart-container {
-  animation: chartScaleIn 0.6s ease-out backwards;
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 1200px) {
+  :root {
+    --spacing-xl: 24px;
+    --spacing-2xl: 36px;
+    --font-size-4xl: 2rem;
+    --font-size-3xl: 1.75rem;
+    --border-radius-lg: 20px;
+  }
+  
+  .chart-container {
+    min-height: 380px;
+    padding: var(--spacing-md);
+  }
+  
+  .chart-container.large-chart {
+    min-height: 420px;
+  }
+  
+  .chart-container h6 {
+    font-size: var(--font-size-lg) !important;
+  }
+  
+  .stat-card h3,
+  .stat-card h4 {
+    font-size: var(--font-size-3xl);
+  }
+  
+  .dashboard-header {
+    padding: var(--spacing-xl);
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --spacing-lg: 16px;
+    --spacing-xl: 20px;
+    --spacing-2xl: 28px;
+    --font-size-4xl: 1.75rem;
+    --font-size-3xl: 1.5rem;
+    --font-size-2xl: 1.25rem;
+    --border-radius: 12px;
+    --border-radius-lg: 16px;
+  }
+  
+  .analytics-dashboard {
+    padding: var(--spacing-md) !important;
+  }
+  
+  .dashboard-header {
+    padding: var(--spacing-lg) !important;
+    margin-bottom: var(--spacing-md);
+  }
+  
+  .dashboard-header h4 {
+    font-size: var(--font-size-3xl);
+  }
+  
+  .dashboard-header .MuiTypography-body1 {
+    font-size: var(--font-size-base);
+  }
+  
+  .chart-container {
+    min-height: 350px;
+    padding: var(--spacing-md);
+  }
+  
+  .chart-container.large-chart {
+    min-height: 380px;
+  }
+  
+  .chart-container h6 {
+    font-size: var(--font-size-base) !important;
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+  }
+  
+  .stat-card {
+    min-height: 140px;
+  }
+  
+  .stat-card h3,
+  .stat-card h4 {
+    font-size: var(--font-size-2xl);
+  }
+  
+  .stat-card .MuiAvatar-root {
+    width: 48px;
+    height: 48px;
+  }
+  
+  .analytics-tabs .MuiTab-root {
+    min-height: 56px;
+    font-size: var(--font-size-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+  
+  .analytics-tabs .MuiTab-root .MuiSvgIcon-root {
+    font-size: 1.1rem;
+    margin-right: var(--spacing-xs);
+  }
+  
+  .recharts-wrapper {
+    min-height: 280px;
+  }
+  
+  .recharts-cartesian-axis-tick-value {
+    font-size: 11px !important;
+  }
+  
+  .recharts-text {
+    font-size: 11px !important;
+  }
+  
+  .recharts-pie-label-text {
+    font-size: 11px !important;
+  }
+  
+  .recharts-legend-item-text {
+    font-size: 11px !important;
+  }
+  
+  .recharts-tooltip-item {
+    font-size: 11px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --spacing-md: 12px;
+    --spacing-lg: 14px;
+    --spacing-xl: 18px;
+    --spacing-2xl: 24px;
+    --font-size-4xl: 1.5rem;
+    --font-size-3xl: 1.25rem;
+    --font-size-2xl: 1.125rem;
+    --border-radius: 10px;
+    --border-radius-lg: 14px;
+  }
+  
+  .analytics-dashboard {
+    padding: var(--spacing-sm) !important;
+  }
+  
+  .dashboard-header {
+    padding: var(--spacing-md) !important;
+  }
+  
+  .dashboard-header h4 {
+    font-size: var(--font-size-2xl);
+  }
+  
+  .chart-container {
+    min-height: 320px;
+    padding: var(--spacing-sm);
+  }
+  
+  .chart-container.large-chart {
+    min-height: 350px;
+  }
+  
+  .chart-container h6 {
+    font-size: var(--font-size-sm) !important;
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .stat-card {
+    min-height: 130px;
+  }
+  
+  .stat-card h3,
+  .stat-card h4 {
+    font-size: var(--font-size-xl);
+  }
+  
+  .stat-card .MuiCardContent-root {
+    padding: var(--spacing-md) !important;
+  }
+  
+  .stat-card .MuiAvatar-root {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .analytics-tabs .MuiTab-root {
+    min-height: 52px;
+    font-size: var(--font-size-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+  
+  .analytics-tabs .MuiTab-root .MuiSvgIcon-root {
+    font-size: 1rem;
+    margin-right: 4px;
+  }
+  
+  .recharts-wrapper {
+    min-height: 250px;
+  }
+  
+  .recharts-cartesian-axis-tick-value {
+    font-size: 10px !important;
+  }
+  
+  .recharts-text {
+    font-size: 10px !important;
+  }
+  
+  .recharts-pie-label-text {
+    font-size: 10px !important;
+  }
+  
+  .MuiButton-root {
+    font-size: var(--font-size-xs);
+    padding: 6px 12px;
+  }
 }
 
 /* ===== DARK MODE SUPPORT ===== */
 @media (prefers-color-scheme: dark) {
   :root {
-    --glass-bg: rgba(30, 30, 40, 0.95);
+    --glass-bg: rgba(30, 30, 45, 0.95);
+    --glass-bg-hover: rgba(30, 30, 45, 0.98);
     --glass-border: rgba(255, 255, 255, 0.1);
   }
   
   .analytics-dashboard {
-    background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+    background: linear-gradient(135deg, #0F0F23 0%, #1A1A2E 50%, #16213E 100%);
+    color: #E2E8F0;
+  }
+  
+  .analytics-dashboard::before {
+    background-image: 
+      radial-gradient(circle at 15% 25%, rgba(99, 102, 241, 0.1) 0%, transparent 40%),
+      radial-gradient(circle at 85% 75%, rgba(139, 92, 246, 0.1) 0%, transparent 40%);
+  }
+  
+  .analytics-dashboard::after {
+    background-image: 
+      linear-gradient(rgba(99, 102, 241, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(99, 102, 241, 0.05) 1px, transparent 1px);
+  }
+  
+  .dashboard-header,
+  .stat-card,
+  .chart-container,
+  .analytics-tabs {
+    background: rgba(30, 30, 45, 0.95);
+    border-color: rgba(255, 255, 255, 0.1);
   }
   
   .chart-container h6,
   .stat-card .MuiTypography-body2 {
-    color: #e2e8f0;
+    color: #E2E8F0;
+  }
+  
+  .dashboard-header .MuiTypography-body1 {
+    color: #CBD5E1;
   }
   
   .recharts-text {
-    fill: #e2e8f0 !important;
+    fill: #E2E8F0 !important;
   }
   
   .recharts-cartesian-axis-tick-value {
-    fill: #94a3b8 !important;
+    fill: #94A3B8 !important;
   }
   
   .recharts-legend-item-text {
-    color: #e2e8f0 !important;
+    color: #E2E8F0 !important;
   }
   
   .recharts-cartesian-grid-horizontal line,
@@ -762,31 +1106,51 @@
     stroke: #334155 !important;
   }
   
-  .dashboard-header .MuiTypography-body1 {
-    color: #cbd5e1;
+  .recharts-default-tooltip {
+    background: rgba(30, 30, 45, 0.98) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+  }
+  
+  .recharts-tooltip-item {
+    color: #E2E8F0 !important;
+  }
+  
+  .recharts-tooltip-label {
+    color: #F1F5F9 !important;
+    border-bottom-color: #334155 !important;
+  }
+  
+  .recharts-default-legend {
+    background: rgba(30, 30, 45, 0.95) !important;
+  }
+  
+  .analytics-dashboard ::-webkit-scrollbar-track {
+    background: rgba(30, 30, 45, 0.5);
+  }
+  
+  .analytics-dashboard ::-webkit-scrollbar-thumb {
+    background: var(--gradient-primary);
+    border-color: rgba(30, 30, 45, 0.5);
   }
 }
 
 /* ===== HIGH CONTRAST MODE ===== */
 @media (prefers-contrast: high) {
-  .recharts-text {
-    fill: #000000 !important;
-    font-weight: 700 !important;
+  :root {
+    --border-width: 2px;
   }
   
-  .recharts-cartesian-axis-tick-value {
-    fill: #000000 !important;
-    font-weight: 700 !important;
-  }
-  
+  .recharts-text,
+  .recharts-cartesian-axis-tick-value,
   .recharts-legend-item-text {
-    color: #000000 !important;
+    fill: #000000 !important;
     font-weight: 700 !important;
   }
   
   .stat-card,
   .chart-container,
-  .analytics-tabs {
+  .analytics-tabs,
+  .dashboard-header {
     border: 2px solid currentColor;
     background: white;
   }
@@ -796,9 +1160,15 @@
   .dashboard-header::before {
     background: currentColor;
   }
+  
+  .recharts-bar-rectangle,
+  .recharts-pie-sector,
+  .recharts-radar-polygon {
+    filter: none;
+  }
 }
 
-/* ===== ACCESSIBILITY ENHANCEMENTS ===== */
+/* ===== REDUCED MOTION ===== */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -806,29 +1176,22 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  .analytics-dashboard::before,
+  .dashboard-header::after {
+    animation: none !important;
   }
 }
 
-/* ===== SCROLLBAR STYLING ===== */
-.analytics-dashboard ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.analytics-dashboard ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 10px;
-}
-
-.analytics-dashboard ::-webkit-scrollbar-thumb {
-  background: var(--primary-gradient);
-  border-radius: 10px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-.analytics-dashboard ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+/* ===== FOCUS VISIBLE STATES ===== */
+.MuiButton-root:focus-visible,
+.MuiIconButton-root:focus-visible,
+.MuiTab-root:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--border-radius-sm);
 }
 
 /* ===== PRINT STYLES ===== */
@@ -837,80 +1200,366 @@
     background: white !important;
   }
   
-  .stat-card,
-  .chart-container,
-  .analytics-tabs {
-    box-shadow: none !important;
-    border: 2px solid #e0e0e0 !important;
-    background: white !important;
-    break-inside: avoid;
+  .analytics-dashboard::before,
+  .analytics-dashboard::after,
+  .dashboard-header::after,
+  .chart-container::before,
+  .stat-card::before,
+  .stat-card::after {
+    display: none !important;
   }
   
-  .dashboard-button,
+  .stat-card,
+  .chart-container,
+  .analytics-tabs,
+  .dashboard-header {
+    box-shadow: none !important;
+    border: 2px solid #E5E7EB !important;
+    background: white !important;
+    backdrop-filter: none !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  
+  .MuiButton-root,
+  .MuiIconButton-root,
   .filter-section {
     display: none !important;
   }
   
   .chart-container {
-    min-height: 350px !important;
+    min-height: 400px !important;
+  }
+  
+  .stat-card h3,
+  .stat-card h4,
+  .dashboard-header h4 {
+    -webkit-text-fill-color: var(--primary) !important;
+    color: var(--primary) !important;
   }
 }
 
-/* ===== FALLBACK STYLES FOR GRAPH VISIBILITY ===== */
+/* ===== UTILITY CLASSES ===== */
+.glass-effect {
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.8);
+}
+
+.gradient-text {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.shadow-glow {
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+}
+
+.transition-all {
+  transition: var(--transition);
+}
+
+/* ===== GRID LAYOUT ENHANCEMENTS ===== */
+.MuiGrid-container {
+  position: relative;
+}
+
+.MuiGrid-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.MuiGrid-item > .chart-container,
+.MuiGrid-item > .stat-card {
+  flex: 1;
+  height: 100%;
+}
+
+/* ===== ENHANCED PAPER COMPONENTS ===== */
+.MuiPaper-root {
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+.MuiPaper-elevation1 {
+  box-shadow: var(--shadow-sm);
+}
+
+.MuiPaper-elevation2 {
+  box-shadow: var(--shadow-md);
+}
+
+.MuiPaper-elevation3 {
+  box-shadow: var(--shadow-lg);
+}
+
+/* ===== LIST ENHANCEMENTS ===== */
+.MuiList-root {
+  padding: 0;
+}
+
+.MuiListItem-root {
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  transition: var(--transition-fast);
+}
+
+.MuiListItem-root:hover {
+  background: rgba(99, 102, 241, 0.04);
+  transform: translateX(4px);
+}
+
+.MuiListItemIcon-root {
+  min-width: 40px;
+}
+
+/* ===== CHIP ENHANCEMENTS ===== */
+.MuiChip-root {
+  border-radius: var(--border-radius-sm);
+  font-weight: 600;
+  transition: var(--transition);
+  font-family: var(--font-family);
+}
+
+.MuiChip-root:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.MuiChip-filled {
+  background: var(--gradient-primary);
+  color: white;
+}
+
+/* ===== AVATAR ENHANCEMENTS ===== */
+.MuiAvatar-root {
+  font-weight: 700;
+  box-shadow: var(--shadow-md);
+  transition: var(--transition);
+}
+
+.MuiAvatar-root:hover {
+  transform: scale(1.05);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ===== LINEAR PROGRESS ENHANCEMENTS ===== */
+.MuiLinearProgress-root {
+  border-radius: var(--border-radius-sm);
+  background-color: var(--gray-200);
+  height: 8px;
+  overflow: hidden;
+}
+
+.MuiLinearProgress-bar {
+  background: var(--gradient-primary);
+  border-radius: var(--border-radius-sm);
+  transition: var(--transition);
+}
+
+/* ===== FORM CONTROLS ===== */
+.MuiFormControl-root {
+  margin-bottom: 0;
+}
+
+.MuiInputLabel-root {
+  font-weight: 600;
+  font-family: var(--font-family);
+  color: var(--gray-600);
+}
+
+.MuiOutlinedInput-root {
+  border-radius: var(--border-radius-sm);
+  transition: var(--transition);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: var(--primary);
+}
+
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: var(--primary);
+  border-width: 2px;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.MuiSelect-root {
+  font-weight: 500;
+  font-family: var(--font-family);
+}
+
+.MuiMenuItem-root {
+  font-family: var(--font-family);
+  font-weight: 500;
+  transition: var(--transition-fast);
+}
+
+.MuiMenuItem-root:hover {
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.MuiMenuItem-root.Mui-selected {
+  background: rgba(99, 102, 241, 0.12);
+  font-weight: 600;
+}
+
+/* ===== TOOLTIP ENHANCEMENTS ===== */
+.MuiTooltip-tooltip {
+  background: rgba(30, 30, 45, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--border-radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  font-family: var(--font-family);
+  box-shadow: var(--shadow-xl);
+}
+
+.MuiTooltip-arrow {
+  color: rgba(30, 30, 45, 0.95);
+}
+
+/* ===== ADDITIONAL CHART CUSTOMIZATIONS ===== */
+.recharts-responsive-container {
+  width: 100% !important;
+  height: 100% !important;
+  flex: 1;
+  min-height: 300px;
+}
+
+/* Better spacing for chart legends */
+.recharts-legend-wrapper {
+  margin-top: var(--spacing-md) !important;
+}
+
+/* Enhanced chart cursor */
+.recharts-cursor {
+  fill: rgba(99, 102, 241, 0.1);
+}
+
+/* Enhanced reference lines */
+.recharts-reference-line-line {
+  stroke: var(--primary);
+  stroke-width: 2px;
+  stroke-dasharray: 5 5;
+}
+
+/* ===== NETWORK GRAPH SPECIFIC STYLES ===== */
+.network-graph-container {
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  position: relative;
+  animation: slideUpFade 0.8s ease-out backwards;
+  min-height: 480px;
+  padding: var(--spacing-lg);
+}
+
+.network-graph-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 25% 35%, rgba(99, 102, 241, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 75% 65%, rgba(139, 92, 246, 0.06) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ===== PERFORMANCE OPTIMIZATIONS ===== */
+.chart-container,
+.stat-card,
+.dashboard-header {
+  will-change: transform;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+/* GPU acceleration for smooth animations */
+.recharts-wrapper,
 .recharts-surface {
-  background: transparent !important;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
-.recharts-default-legend {
-  background: rgba(255, 255, 255, 0.95) !important;
-  backdrop-filter: blur(10px) !important;
-  border-radius: 8px !important;
-  padding: 10px !important;
-  margin-top: 8px !important;
-}
-
-/* Fix for potential z-index issues */
-.recharts-tooltip-wrapper {
-  z-index: 9999 !important;
-}
-
-/* Ensure proper contrast */
-.recharts-label {
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.9) !important;
-}
-
-/* Custom class for larger charts */
+/* ===== EXTRA LARGE CHART VARIANT ===== */
 .extra-large-chart {
-  min-height: 500px !important;
-  padding: 24px !important;
+  min-height: 540px !important;
+  padding: var(--spacing-xl) !important;
 }
 
 .extra-large-chart h6 {
-  font-size: 1.4rem !important;
-  margin-bottom: 24px;
+  font-size: var(--font-size-2xl) !important;
+  margin-bottom: var(--spacing-xl) !important;
 }
 
-/* Loading states for charts */
-.chart-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 350px;
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: var(--border-radius);
+.extra-large-chart .recharts-wrapper {
+  min-height: 400px;
 }
 
-/* Error states for charts */
+/* ===== ERROR & EMPTY STATES ===== */
 .chart-error {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 350px;
-  background: rgba(254, 226, 226, 0.8);
+  background: linear-gradient(135deg, rgba(254, 226, 226, 0.4) 0%, rgba(254, 226, 226, 0.2) 100%);
   border-radius: var(--border-radius);
-  border: 1px solid rgba(248, 113, 113, 0.3);
-  color: #dc2626;
+  border: 2px dashed rgba(248, 113, 113, 0.3);
+  color: var(--error);
   font-weight: 600;
   text-align: center;
-  padding: 20px;
+  padding: var(--spacing-xl);
+  animation: slideUpFade 0.4s ease-out;
 }
+
+.chart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 350px;
+  background: linear-gradient(135deg, rgba(229, 231, 235, 0.4) 0%, rgba(229, 231, 235, 0.2) 100%);
+  border-radius: var(--border-radius);
+  border: 2px dashed var(--gray-300);
+  color: var(--gray-500);
+  font-weight: 600;
+  text-align: center;
+  padding: var(--spacing-xl);
+  animation: slideUpFade 0.4s ease-out;
+}
+
+/* ===== SUCCESS INDICATORS ===== */
+.success-indicator {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.warning-indicator {
+  color: var(--warning);
+  font-weight: 700;
+}
+
+.error-indicator {
+  color: var(--error);
+  font-weight: 700;
+}
+
+/* ===== END OF STYLESHEET ===== */

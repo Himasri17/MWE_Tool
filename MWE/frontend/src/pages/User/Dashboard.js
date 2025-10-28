@@ -513,13 +513,20 @@ export default function Dashboard() {
     const handleRemoveTag = async (tagId) => {
         if (!selectedSentence) return;
         
-        const response = await fetchWithAuth(`http://127.0.0.1:5001/sentences/${selectedSentence._id}/tags/${tagId}`, { 
+        const response = await fetchWithAuth(`http://127.0.0.1:5001/api/tags/${tagId}`, { 
             method: 'DELETE' 
         });
         
         if (!response) return; // Authentication failed
         
-        await fetchTags();
+        if (response.ok) {
+            await fetchTags();
+            // Optional: Show success message
+            console.log("Tag removed successfully");
+        } else {
+            console.error('Failed to remove tag');
+            alert('Failed to remove tag. Please try again.');
+        }
     };
 
 
@@ -992,7 +999,7 @@ export default function Dashboard() {
                                                         )}
                                                     </Box>
                                                 }
-                                                onDelete={tag.status === 'approved' ? () => handleRemoveTag(tag._id) : undefined}
+                                                onDelete={() => handleRemoveTag(tag._id)} // Remove the condition - always show delete
                                                 onClick={() => handleStartEditTag(tag)} 
                                                 color={tag.status === 'pending' ? "default" : "primary"}
                                                 variant={tag.status === 'pending' ? "outlined" : "filled"}
@@ -1004,8 +1011,8 @@ export default function Dashboard() {
                                                 }}
                                                 title={
                                                     tag.status === 'pending' 
-                                                        ? `Pending review - ${tag.review_comments || 'No comments'}`
-                                                        : `Approved - Annotated by: ${tag.username}`
+                                                        ? `Pending review - ${tag.review_comments || 'No comments'} - Click to edit, X to delete`
+                                                        : `Approved - Annotated by: ${tag.username} - Click to edit, X to delete`
                                                 }
                                             />
                                         ))}

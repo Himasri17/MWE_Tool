@@ -75,3 +75,29 @@ export const refreshTokenIfNeeded = async () => {
         return false;
     }
 };
+
+// Add to authUtils.js
+export const validateToken = () => {
+    const token = getToken();
+    if (!token) return false;
+    
+    try {
+        // Check if token is expired
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const exp = payload.exp * 1000; // Convert to milliseconds
+        const now = Date.now();
+        
+        if (exp < now) {
+            console.log('Token has expired');
+            removeToken();
+            return false;
+        }
+        
+        console.log('Token is valid, user:', payload.username, 'role:', payload.role);
+        return true;
+    } catch (error) {
+        console.error('Error validating token:', error);
+        removeToken();
+        return false;
+    }
+};

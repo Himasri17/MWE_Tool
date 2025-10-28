@@ -23,7 +23,7 @@ import AssignUsersDialog from './AssignUsersDialog';
 import EditProjectModal from './EditProjectModal';
 import ContactUsDialog from '../User/ContactUsDialog';
 import TermsDialog from '../User Authentication/TermsDialog';
-import { getAuthHeaders, removeToken } from '../../components/authUtils'; 
+import { getAuthHeaders, removeToken ,validateToken} from '../../components/authUtils'; 
 import Navbar from '../../components/Navbar';
 
 export default function AdminDashboard() {
@@ -62,12 +62,19 @@ export default function AdminDashboard() {
     const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
 
-    // --- Data Fetching (Live API Integration) ---
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
+            // Check if token exists
+            const token = localStorage.getItem('jwt_token');
+            if (!token) {
+                console.error('No token found');
+                handleUnauthorized();
+                return;
+            }
 
-        
+            console.log('Making requests with token:', token);
+
             const [projectsResponse, pendingUsersResponse, feedbacksResponse] = await Promise.all([
                 fetch("http://127.0.0.1:5001/api/projects", {
                     headers: getAuthHeaders()
@@ -80,13 +87,17 @@ export default function AdminDashboard() {
                 })
             ]);
             
+            console.log('Projects response status:', projectsResponse.status);
+            console.log('Pending users response status:', pendingUsersResponse.status);
+            console.log('Feedbacks response status:', feedbacksResponse.status);
+            
             if (!projectsResponse.ok) {
                 console.error(`Projects API Error: Status ${projectsResponse.status}`);
-                setProjects([]);
                 if (projectsResponse.status === 401 || projectsResponse.status === 403) { 
                     handleUnauthorized();
                     return; 
                 }
+                setProjects([]);
             } else {
                 const projectsData = await projectsResponse.json();
                 setProjects(projectsData);
@@ -100,7 +111,6 @@ export default function AdminDashboard() {
                 setPendingUsersCount(0);
             }
             
-            // Handle Feedbacks
             if (feedbacksResponse.ok) {
                 const feedbacksData = await feedbacksResponse.json();
                 setFeedbacks(feedbacksData);
@@ -120,19 +130,26 @@ export default function AdminDashboard() {
     }, []);
 
     useEffect(() => {
+        console.log('Current token:', localStorage.getItem('jwt_token'));
+        console.log('Auth headers:', getAuthHeaders());
+        }, []);
+
+        useEffect(() => {
         const validateAdminAccess = async () => {
+            // First validate token
+            if (!validateToken()) {
+                handleUnauthorized();
+                return;
+            }
+
             try {
                 const token = localStorage.getItem('jwt_token');
-                if (!token) {
-                    handleUnauthorized();
-                    return;
-                }
-
-                // Decode token to check role
                 const payload = JSON.parse(atob(token.split('.')[1]));
+                
+                console.log('User role from token:', payload.role);
+                
                 if (payload.role !== 'admin') {
                     showSnackbar('Admin access required. Please log in as admin.', 'error');
-                    // Redirect to login after a delay
                     setTimeout(() => {
                         removeToken();
                         navigate('/login');
@@ -140,7 +157,7 @@ export default function AdminDashboard() {
                     return;
                 }
 
-                // Token is valid, proceed with data fetch
+                // Token is valid and user is admin, proceed with data fetch
                 fetchData();
             } catch (error) {
                 console.error('Token validation error:', error);
@@ -149,17 +166,9 @@ export default function AdminDashboard() {
         };
 
         validateAdminAccess();
-    }, [navigate]);
+    }, [navigate, fetchData]);
 
-    // --- Auto-refresh useEffect - MOVED AFTER fetchData definition ---
-    useEffect(() => {
-        const interval = setInterval(() => {
-            fetchData();
-        }, 30000); // Refresh every 30 seconds
-
-        return () => clearInterval(interval);
-    }, [fetchData]);
-
+  
     // --- Initial data load ---
     useEffect(() => {
         fetchData();
