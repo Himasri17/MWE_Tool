@@ -227,83 +227,88 @@ export default function ProjectSentencesReview() {
         );
     };
 
+    const PASTEL_ANNOTATED_GREEN = '#C8E6C9'; 
     const renderSentenceBox = (sentence) => (
-        <Paper
-            key={sentence._id}
-            onClick={() => handleSentenceClick(sentence)} 
-            elevation={selectedSentenceData?._id === sentence._id ? 3 : 1}
-            sx={{
-                p: 2, 
-                mb: 2, 
-                cursor: 'pointer', 
-                backgroundColor: selectedSentenceData?._id === sentence._id 
-                    ? theme.palette.action.selected 
-                    : (sentence.is_annotated ? theme.palette.success.light : theme.palette.common.white),
-                border: selectedSentenceData?._id === sentence._id 
-                    ? `2px solid ${theme.palette.primary.main}` 
-                    : `1px solid ${theme.palette.grey[300]}`,
-                '&:hover': { 
-                    backgroundColor: theme.palette.action.hover,
-                    boxShadow: theme.shadows[2] 
-                },
-                transition: 'all 0.2s ease-in-out'
-            }}
-        >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <Typography 
-                    variant="body1" 
-                    sx={{ 
-                        fontWeight: 500, 
-                        color: theme.palette.text.primary,
-                        wordBreak: 'break-word',
-                        flex: 1
-                    }}
-                >
-                    {sentence.textContent}
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 1 }}>
-                    {sentence.is_annotated && (
-                        <Chip 
-                            label="Annotated" 
-                            size="small" 
-                            color="success" 
-                            variant="filled"
-                            sx={{ minWidth: 90 }}
-                        />
-                    )}
-                    {sentence.tags && sentence.tags.length > 0 && (
-                        <Chip 
-                            label={`${sentence.tags.length} tags`} 
-                            size="small" 
-                            color="primary" 
-                            variant="outlined"
-                        />
-                    )}
-                </Box>
+    <Paper
+        key={sentence._id}
+        onClick={() => handleSentenceClick(sentence)} 
+        elevation={selectedSentenceData?._id === sentence._id ? 3 : 1}
+        sx={{
+            p: 2, 
+            mb: 2, 
+            cursor: 'pointer', 
+            backgroundColor: selectedSentenceData?._id === sentence._id 
+                ? theme.palette.action.selected 
+                // UPDATED COLOR LOGIC HERE: Use the pastel green hex for annotated sentences
+                : (sentence.is_annotated ? PASTEL_ANNOTATED_GREEN : theme.palette.common.white),
+            border: selectedSentenceData?._id === sentence._id 
+                ? `2px solid ${theme.palette.primary.main}` 
+                : `1px solid ${theme.palette.grey[300]}`,
+            '&:hover': { 
+                backgroundColor: theme.palette.action.hover,
+                boxShadow: theme.shadows[2] 
+            },
+            transition: 'all 0.2s ease-in-out'
+        }}
+    >
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <Typography 
+                variant="body1" 
+                sx={{ 
+                    fontWeight: 500, 
+                    color: theme.palette.text.primary,
+                    wordBreak: 'break-word',
+                    flex: 1
+                }}
+            >
+                {sentence.textContent}
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 1 }}>
+                {sentence.is_annotated && (
+                    <Chip 
+                        label="Annotated" 
+                        size="small" 
+                        color="success" 
+                        variant="filled"
+                        sx={{ minWidth: 90 }}
+                    />
+                )}
+                {sentence.tags && sentence.tags.length > 0 && (
+                    <Chip 
+                        label={`${sentence.tags.length} tags`} 
+                        size="small" 
+                        color="primary" 
+                        variant="outlined"
+                    />
+                )}
             </Box>
-            {sentence.tags && sentence.tags.length > 0 && (
-                <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {sentence.tags.slice(0, 3).map((tag, index) => (
-                        <Chip 
-                            key={index}
-                            label={`${tag.text} (${tag.tag})`}
-                            size="small"
-                            variant="outlined"
-                            sx={{ fontSize: '0.7rem', height: 24 }}
-                        />
-                    ))}
-                    {sentence.tags.length > 3 && (
-                        <Chip 
-                            label={`+${sentence.tags.length - 3} more`}
-                            size="small"
-                            variant="outlined"
-                            sx={{ fontSize: '0.7rem', height: 24 }}
-                        />
-                    )}
-                </Box>
-            )}
-        </Paper>
-    );
+        </Box>
+        {sentence.tags && sentence.tags.length > 0 && (
+            <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {sentence.tags.slice(0, 3).map((tag, index) => (
+                    <Chip 
+                        key={index}
+                        label={`${tag.text} (${tag.tag})`}
+                        size="small"
+                        variant="outlined"
+                        sx={{ fontSize: '0.7rem', height: 24 }}
+                    />
+                ))}
+                {sentence.tags.length > 3 && (
+                    <Chip 
+                        label={`+${sentence.tags.length - 3} more`}
+                        size="small"
+                        variant="outlined"
+                        sx={{ fontSize: '0.7rem', height: 24 }}
+                    />
+                )}
+            </Box>
+        )}
+    </Paper>
+);
+
+
+
 
     if (isLoading) {
         return (
