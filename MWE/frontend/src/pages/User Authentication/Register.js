@@ -13,6 +13,7 @@ import GroupIcon from '@mui/icons-material/Group';
 import BusinessIcon from '@mui/icons-material/Business';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import TermsDialog from './TermsDialog';
 
 // IMPORT NEW COMPONENT
 import ContactUsDialog from '../User/ContactUsDialog'; 
@@ -24,6 +25,7 @@ export default function Register() {
     const [password, setPassword] = useState('');
     const [role, setRole] = useState('user');
     const [organization, setOrganization] = useState('');
+    const [termsDialogOpen, setTermsDialogOpen] = useState(false);
     const [languages, setLanguages] = useState(''); 
     const [error, setError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -32,6 +34,7 @@ export default function Register() {
     
     // RETAIN: Only the 'open' state is needed here to control the dialog
     const [isContactDialogOpen, setIsContactDialogOpen] = useState(false); // <--- ADD DIALOG STATE
+    const [isTermsDialogOpen, setIsTermsDialogOpen] = useState(false); // <--- ADD DIALOG STATE
     
     const theme = useTheme();
 
@@ -101,7 +104,12 @@ export default function Register() {
         e.preventDefault(); // Prevent navigation/default link action
         setIsContactDialogOpen(true); 
     }; // <--- ADD OPEN HANDLER
-    const handleCloseContactDialog = () => { setIsContactDialogOpen(false); }; // <--- ADD CLOSE HANDLER
+    const handleCloseContactDialog = () => { setIsContactDialogOpen(false); };
+    const handleOpenTermsDialog = (e) => { 
+        e.preventDefault(); // Prevent navigation/default link action
+        setIsTermsDialogOpen(true); 
+    }; // <--- ADD OPEN HANDLER
+    const handleCloseTermsDialog = () => { setIsTermsDialogOpen(false); }; 
 
 
     // --- JSX Render ---
@@ -232,15 +240,20 @@ export default function Register() {
                     <MuiLink component="a" href="#" onClick={handleOpenContactDialog} color="inherit" underline="hover" variant="body2">
                         Contact Us {/* <--- ATTACHED HANDLER */}
                     </MuiLink>
-                    <MuiLink component={Link} to="#" color="inherit" underline="hover" variant="body2">Terms & Conditions</MuiLink>
+                    <MuiLink  component="a" href="#" onClick={handleOpenTermsDialog} color="inherit" underline="hover" variant="body2">Terms & Conditions</MuiLink>
                 </Container>
             </Box>
 
             {/* --- CONTACT US DIALOG --- */}
             <ContactUsDialog 
                 open={isContactDialogOpen} 
-                handleClose={handleCloseContactDialog} 
+                onClose={handleCloseContactDialog} 
             /> 
+
+             <TermsDialog 
+                            open={isTermsDialogOpen}
+                            onClose={() => handleCloseTermsDialog(false)}
+                        />
 
         </Box>
     );
