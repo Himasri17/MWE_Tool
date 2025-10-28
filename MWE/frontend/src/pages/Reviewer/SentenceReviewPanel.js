@@ -778,14 +778,14 @@ export default function SentenceReviewPanel() {
 
     const renderSentenceBox = (sentence) => {
         // --- Custom Pastel Color Definition ---
-        const PASTEL_GREEN_HEX = '#E8F5E9'; 
-        const PASTEL_ACCENT_HEX = '#C8E6C9'; 
+        const PASTEL_GREEN_HEX = '#bee9bfff'; 
+        const PASTEL_ACCENT_HEX = '#91d694ff'; 
 
-        const PASTEL_BLUE_HEX = '#E3F2FD'; 
+        const PASTEL_BLUE_HEX = '#cae1f1ff'; 
         const PASTEL_BLUE_ACCENT_HEX = '#90CAF9'; 
 
-        const PASTEL_YELLOW_HEX = '#FFF9C4'; 
-        const PASTEL_YELLOW_ACCENT_HEX = '#FFEB3B'; 
+        const PASTEL_YELLOW_HEX = '#fffaceff'; 
+        const PASTEL_YELLOW_ACCENT_HEX = '#fff06dff'; 
 
         // --- UPDATED LOGIC FOR MIXED STATUS VISUALIZATION ---
         const pendingTagsCount = sentence.tags.filter(t => t.review_status === 'Pending').length;
