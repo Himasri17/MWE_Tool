@@ -43,16 +43,24 @@ const fetchReviewerStats = async (username) => {
     }
 };
 
-// Function to calculate pending reviews from projects data
 const calculatePendingReviews = (projects) => {
     let totalPending = 0;
+    console.log("Calculating pending reviews from projects:", projects);
+    
     projects.forEach(project => {
+        console.log(`Project: ${project.name}, Users:`, project.usersToReview);
         project.usersToReview.forEach(user => {
-            const reviewedSentences = user.reviewed || 0;
-            const pendingReview = user.completed - reviewedSentences;
-            totalPending += Math.max(0, pendingReview);
+            // FIXED: Use completed (annotated) minus reviewed
+            const annotatedCount = user.completed || 0;
+            const reviewedCount = user.reviewed || 0;
+            const pendingReview = Math.max(0, annotatedCount - reviewedCount);
+            totalPending += pendingReview;
+            
+            console.log(`User ${user.username}: ${annotatedCount} annotated, ${reviewedCount} reviewed, ${pendingReview} pending`);
         });
     });
+    
+    console.log(`Total pending reviews calculated: ${totalPending}`);
     return totalPending;
 };
 

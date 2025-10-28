@@ -1,6 +1,6 @@
 /* ===============================================
-   ANALYTICS DASHBOARD - COMPLETE ENHANCED CSS
-   FIXED CHART SIZES & READABILITY
+   ANALYTICS DASHBOARD - FIXED CHART SIZES
+   REMOVED FIXED HEIGHTS FOR BETTER READABILITY
    =============================================== */
 
 /* ===== ROOT VARIABLES ===== */
@@ -49,7 +49,7 @@
   animation: floatBackground 20s ease-in-out infinite;
 }
 
-/* ===== LARGER CHART CONTAINERS ===== */
+/* ===== FLEXIBLE CHART CONTAINERS ===== */
 .chart-container {
   background: var(--glass-bg);
   backdrop-filter: blur(20px) saturate(180%);
@@ -60,55 +60,20 @@
   overflow: hidden;
   position: relative;
   animation: slideUpFade 0.6s ease-out backwards;
-  min-height: 450px; /* Increased minimum height */
-  padding: 24px; /* Added padding */
+  min-height: 400px; /* Reasonable minimum height */
+  padding: 20px;
   display: flex;
   flex-direction: column;
 }
 
-/* Main chart containers should be even larger */
+
 .chart-container.large-chart {
-  min-height: 520px;
-  padding: 28px;
+  min-height: 450px;
+  height: auto !important;
 }
 
-/* ===== SPECIFIC CHART SIZE FIXES ===== */
 
-/* MWE Type Distribution - Make it much larger */
-.chart-container:has(.recharts-bar-chart) {
-  min-height: 480px !important;
-  height: 480px !important;
-}
-
-/* MWE Categories (Pie Chart) - Make it larger */
-.chart-container:has(.recharts-pie-chart) {
-  min-height: 460px !important;
-  height: 460px !important;
-}
-
-/* User Performance Distribution */
-.chart-container:has(.recharts-bar-chart) ~ .chart-container:has(.recharts-bar-chart) {
-  min-height: 520px !important;
-  height: 520px !important;
-}
-
-/* Performance Radar Chart */
-.chart-container:has(.recharts-radar-chart) {
-  min-height: 520px !important;
-  height: 520px !important;
-}
-
-/* Area Charts */
-.chart-container:has(.recharts-area-chart) {
-  min-height: 500px !important;
-  height: 500px !important;
-}
-
-/* Line Charts */
-.chart-container:has(.recharts-line-chart) {
-  min-height: 480px !important;
-  height: 480px !important;
-}
+/* Charts will now be responsive and fill available space */
 
 .chart-container::before {
   content: '';
@@ -129,16 +94,17 @@
   border-color: rgba(99, 102, 241, 0.3);
 }
 
-/* ===== LARGER CHART TITLES ===== */
+/* ===== CHART TITLES ===== */
 .chart-container h6 {
   color: #111827;
   font-weight: 700;
-  font-size: 1.4rem !important; /* Larger title */
-  margin-bottom: 28px;
-  padding-bottom: 16px;
+  font-size: 1.3rem !important;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
   border-bottom: 2px solid #F3F4F6;
   position: relative;
   line-height: 1.3;
+  flex-shrink: 0; /* Prevent title from shrinking */
 }
 
 .chart-container h6::after {
@@ -159,46 +125,46 @@
 
 /* ===== ENHANCED CHART TEXT SIZES ===== */
 
-/* Axis labels - Much larger */
+/* Axis labels */
 .recharts-cartesian-axis-tick-value {
-  fill: #6B7280 !important;
-  font-size: 14px !important; /* Increased from 11px */
-  font-weight: 600 !important;
-  font-family: 'Inter', sans-serif !important;
-}
-
-.recharts-polar-angle-axis-tick-value {
   fill: #6B7280 !important;
   font-size: 13px !important;
   font-weight: 600 !important;
   font-family: 'Inter', sans-serif !important;
 }
 
-.recharts-polar-radius-axis-tick-value {
+.recharts-polar-angle-axis-tick-value {
   fill: #6B7280 !important;
   font-size: 12px !important;
   font-weight: 600 !important;
+  font-family: 'Inter', sans-serif !important;
 }
 
-/* Chart labels - Larger */
+.recharts-polar-radius-axis-tick-value {
+  fill: #6B7280 !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}
+
+/* Chart labels */
 .recharts-text {
   fill: #374151 !important;
   font-family: 'Inter', sans-serif !important;
   font-weight: 600 !important;
-  font-size: 14px !important; /* Increased from 12px */
+  font-size: 13px !important;
 }
 
-/* Legend text - Larger */
+/* Legend text */
 .recharts-legend-item-text {
   color: #374151 !important;
   font-weight: 600 !important;
-  font-size: 14px !important; /* Increased from 13px */
+  font-size: 13px !important;
   font-family: 'Inter', sans-serif !important;
 }
 
-/* Tooltip text - Larger */
+/* Tooltip text */
 .recharts-tooltip-item {
-  font-size: 14px !important;
+  font-size: 13px !important;
   font-family: 'Inter', sans-serif !important;
   font-weight: 600 !important;
 }
@@ -216,7 +182,8 @@
 /* Ensure charts are visible and properly styled */
 .recharts-wrapper {
   font-family: 'Inter', sans-serif !important;
-  flex: 1 !important;
+  flex: 1 !important; /* This makes the chart fill available space */
+  min-height: 300px; /* Ensure minimum chart height */
 }
 
 .recharts-surface {
@@ -238,7 +205,7 @@
 
 /* ===== SPECIFIC CHART ENHANCEMENTS ===== */
 
-/* Bar Charts - Larger bars with better spacing */
+/* Bar Charts */
 .recharts-bar-rectangle {
   rx: 6 !important;
   ry: 6 !important;
@@ -246,7 +213,7 @@
 }
 
 .recharts-bar-chart .recharts-bar {
-  bar-size: 32 !important; /* Thicker bars */
+  bar-size: 28 !important;
 }
 
 .recharts-bar-rectangle:hover {
@@ -254,20 +221,20 @@
   transform: scale(1.05) !important;
 }
 
-/* Pie Charts - Larger segments and labels */
+/* Pie Charts */
 .recharts-pie-sector {
   stroke: white !important;
-  stroke-width: 3px !important; /* Thicker borders */
+  stroke-width: 2px !important;
   transition: all 0.3s ease !important;
 }
 
 .recharts-pie-sector:hover {
-  stroke-width: 4px !important;
+  stroke-width: 3px !important;
   opacity: 0.9 !important;
 }
 
 .recharts-pie-label-text {
-  font-size: 14px !important;
+  font-size: 13px !important;
   font-weight: 700 !important;
   fill: #111827 !important;
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8) !important;
@@ -278,40 +245,40 @@
   stroke-width: 1px !important;
 }
 
-/* Radar Charts - Larger text and better spacing */
+/* Radar Charts */
 .recharts-radar-polygon {
   stroke-width: 2px !important;
 }
 
 .recharts-polar-radius-axis-tick-value {
-  font-size: 12px !important;
+  font-size: 11px !important;
   font-weight: 600 !important;
 }
 
 .recharts-radar-dot {
-  r: 5 !important; /* Larger dots */
+  r: 4 !important;
   transition: all 0.3s ease !important;
 }
 
 .recharts-radar-dot:hover {
-  r: 7 !important;
-  stroke-width: 3px !important;
+  r: 6 !important;
+  stroke-width: 2px !important;
 }
 
-/* Line Charts - Thicker lines */
+/* Line Charts */
 .recharts-line-curve {
-  stroke-width: 3px !important;
+  stroke-width: 2px !important;
   stroke-linecap: round !important;
 }
 
 .recharts-line-dots circle {
-  r: 5 !important; /* Larger dots */
+  r: 4 !important;
   transition: all 0.3s ease !important;
 }
 
 .recharts-line-dots circle:hover {
-  r: 7 !important;
-  stroke-width: 3px !important;
+  r: 6 !important;
+  stroke-width: 2px !important;
 }
 
 /* Area Charts */
@@ -334,21 +301,21 @@
   border: 1px solid rgba(255, 255, 255, 0.8) !important;
   border-radius: 12px !important;
   box-shadow: var(--shadow-xl) !important;
-  padding: 20px !important;
+  padding: 16px !important;
   animation: tooltipSlideIn 0.2s ease-out !important;
 }
 
 .custom-recharts-tooltip .tooltip-label {
   color: #111827 !important;
   font-weight: 700 !important;
-  font-size: 1rem !important;
-  margin-bottom: 8px !important;
+  font-size: 0.9rem !important;
+  margin-bottom: 6px !important;
 }
 
 .custom-recharts-tooltip .tooltip-value {
   color: #6366F1 !important;
   font-weight: 800 !important;
-  font-size: 1.2rem !important;
+  font-size: 1.1rem !important;
 }
 
 /* ===== ENHANCED STAT CARDS ===== */
@@ -363,7 +330,7 @@
   overflow: hidden;
   cursor: pointer;
   animation: slideUpFade 0.6s ease-out backwards;
-  min-height: 160px;
+  min-height: 140px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -408,7 +375,7 @@
 .stat-card .MuiCardContent-root {
   position: relative;
   z-index: 1;
-  padding: 24px !important;
+  padding: 20px !important;
 }
 
 .stat-card h4 {
@@ -417,7 +384,7 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
   font-weight: 800;
-  font-size: 2.5rem;
+  font-size: 2.2rem;
   margin-bottom: 8px;
   line-height: 1;
 }
@@ -425,7 +392,7 @@
 .stat-card .MuiTypography-body2 {
   color: #6B7280;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 4px;
@@ -434,7 +401,7 @@
 .stat-card .MuiTypography-caption {
   color: #9CA3AF;
   font-weight: 500;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
 }
 
 /* ===== NETWORK GRAPH CONTAINER ===== */
@@ -447,8 +414,8 @@
   overflow: hidden;
   position: relative;
   animation: slideUpFade 0.8s ease-out backwards;
-  min-height: 500px;
-  padding: 24px;
+  min-height: 450px;
+  padding: 20px;
 }
 
 .network-graph-container::before {
@@ -469,11 +436,11 @@
   border: 1px solid rgba(255, 255, 255, 0.8);
   border-radius: var(--border-radius);
   box-shadow: var(--shadow-lg);
-  padding: 32px;
+  padding: 28px;
   position: relative;
   overflow: hidden;
   animation: slideDown 0.6s ease-out;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .dashboard-header::before {
@@ -494,14 +461,14 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
   font-weight: 800;
-  font-size: 2.25rem;
+  font-size: 2rem;
   margin-bottom: 8px;
   line-height: 1.2;
 }
 
 .dashboard-header .MuiTypography-body1 {
   color: #6B7280;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 500;
   line-height: 1.5;
 }
@@ -517,19 +484,19 @@
   border-bottom: none;
   position: relative;
   z-index: 10;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .analytics-tabs .MuiTab-root {
   font-weight: 600;
   text-transform: none;
-  font-size: 1rem;
-  min-height: 70px;
+  font-size: 0.95rem;
+  min-height: 60px;
   transition: var(--transition);
   color: #6B7280;
   position: relative;
   overflow: hidden;
-  padding: 16px 24px;
+  padding: 14px 20px;
 }
 
 .analytics-tabs .MuiTab-root:hover {
@@ -551,10 +518,10 @@
 
 .analytics-tabs .MuiTab-root .MuiSvgIcon-root {
   margin-right: 8px;
-  font-size: 1.25rem;
+  font-size: 1.2rem;
 }
 
-/* ===== RESPONSIVE CHART SIZING ===== */
+/* ===== RESPONSIVE DESIGN ===== */
 
 @media (max-width: 1200px) {
   :root {
@@ -562,27 +529,21 @@
   }
   
   .chart-container {
+    min-height: 380px;
+    padding: 18px;
+  }
+  
+  .chart-container.large-chart {
     min-height: 420px;
     padding: 20px;
   }
   
-  .chart-container:has(.recharts-bar-chart),
-  .chart-container:has(.recharts-pie-chart) {
-    min-height: 440px !important;
-    height: 440px !important;
-  }
-  
-  .chart-container:has(.recharts-radar-chart) {
-    min-height: 480px !important;
-    height: 480px !important;
-  }
-  
   .chart-container h6 {
-    font-size: 1.3rem !important;
+    font-size: 1.2rem !important;
   }
   
   .stat-card h4 {
-    font-size: 2.25rem;
+    font-size: 2rem;
   }
 }
 
@@ -592,77 +553,25 @@
   }
 
   .analytics-dashboard {
-    padding: 16px !important;
+    padding: 12px !important;
   }
   
   .dashboard-header {
-    padding: 24px !important;
+    padding: 20px !important;
   }
   
   .dashboard-header h4 {
-    font-size: 1.75rem;
-  }
-  
-  .chart-container {
-    min-height: 380px;
-    padding: 16px;
-  }
-  
-  .chart-container:has(.recharts-bar-chart),
-  .chart-container:has(.recharts-pie-chart) {
-    min-height: 400px !important;
-    height: 400px !important;
-  }
-  
-  .chart-container:has(.recharts-radar-chart) {
-    min-height: 420px !important;
-    height: 420px !important;
-  }
-  
-  .chart-container h6 {
-    font-size: 1.2rem !important;
-    margin-bottom: 20px;
-  }
-  
-  .stat-card h4 {
-    font-size: 2rem;
-  }
-  
-  .analytics-tabs .MuiTab-root {
-    min-height: 60px;
-    font-size: 0.9rem;
-    padding: 12px 16px;
-  }
-  
-  /* Improve chart visibility on mobile */
-  .recharts-wrapper {
-    transform: scale(0.98);
-    transform-origin: center;
-  }
-  
-  .recharts-cartesian-axis-tick-value {
-    font-size: 12px !important;
-  }
-  
-  .recharts-text {
-    font-size: 12px !important;
-  }
-}
-
-@media (max-width: 480px) {
-  .dashboard-header h4 {
-    font-size: 1.5rem;
+    font-size: 1.6rem;
   }
   
   .chart-container {
     min-height: 350px;
-    padding: 12px;
+    padding: 16px;
   }
   
-  .chart-container:has(.recharts-bar-chart),
-  .chart-container:has(.recharts-pie-chart) {
-    min-height: 380px !important;
-    height: 380px !important;
+  .chart-container.large-chart {
+    min-height: 380px;
+    padding: 18px;
   }
   
   .chart-container h6 {
@@ -671,13 +580,18 @@
   }
   
   .stat-card h4 {
-    font-size: 1.75rem;
+    font-size: 1.8rem;
   }
   
   .analytics-tabs .MuiTab-root {
     min-height: 56px;
-    font-size: 0.85rem;
-    padding: 10px 12px;
+    font-size: 0.9rem;
+    padding: 12px 16px;
+  }
+  
+  /* Improve chart visibility on mobile */
+  .recharts-wrapper {
+    min-height: 250px;
   }
   
   .recharts-cartesian-axis-tick-value {
@@ -686,6 +600,45 @@
   
   .recharts-text {
     font-size: 11px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-header h4 {
+    font-size: 1.4rem;
+  }
+  
+  .chart-container {
+    min-height: 320px;
+    padding: 14px;
+  }
+  
+  .chart-container.large-chart {
+    min-height: 350px;
+    padding: 16px;
+  }
+  
+  .chart-container h6 {
+    font-size: 1rem !important;
+    margin-bottom: 14px;
+  }
+  
+  .stat-card h4 {
+    font-size: 1.6rem;
+  }
+  
+  .analytics-tabs .MuiTab-root {
+    min-height: 52px;
+    font-size: 0.85rem;
+    padding: 10px 12px;
+  }
+  
+  .recharts-cartesian-axis-tick-value {
+    font-size: 10px !important;
+  }
+  
+  .recharts-text {
+    font-size: 10px !important;
   }
 }
 
@@ -702,19 +655,19 @@
 .MuiGrid-container .MuiGrid-item {
   display: flex;
   flex-direction: column;
-  min-height: 0; /* Important for flexbox sizing */
+  min-height: 0;
 }
 
 .MuiGrid-container .MuiGrid-item > .chart-container {
   flex: 1;
-  min-height: 0; /* Important for flexbox sizing */
+  min-height: 0;
 }
 
-/* ResponsiveContainer should take full available space */
 .recharts-responsive-container {
   width: 100% !important;
   height: 100% !important;
   flex: 1 !important;
+  min-height: 300px;
 }
 
 /* ===== ANIMATIONS ===== */
@@ -814,7 +767,7 @@
   }
 }
 
-/* ===== HIGH CONTRAST MODE FOR BETTER READABILITY ===== */
+/* ===== HIGH CONTRAST MODE ===== */
 @media (prefers-contrast: high) {
   .recharts-text {
     fill: #000000 !important;
@@ -899,13 +852,11 @@
   }
   
   .chart-container {
-    min-height: 400px !important;
-    height: 400px !important;
+    min-height: 350px !important;
   }
 }
 
 /* ===== FALLBACK STYLES FOR GRAPH VISIBILITY ===== */
-/* Ensure charts are always visible */
 .recharts-surface {
   background: transparent !important;
 }
@@ -914,8 +865,8 @@
   background: rgba(255, 255, 255, 0.95) !important;
   backdrop-filter: blur(10px) !important;
   border-radius: 8px !important;
-  padding: 12px !important;
-  margin-top: 10px !important;
+  padding: 10px !important;
+  margin-top: 8px !important;
 }
 
 /* Fix for potential z-index issues */
@@ -928,16 +879,15 @@
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.9) !important;
 }
 
-/* Custom class for very large charts */
+/* Custom class for larger charts */
 .extra-large-chart {
-  min-height: 600px !important;
-  height: 600px !important;
-  padding: 32px !important;
+  min-height: 500px !important;
+  padding: 24px !important;
 }
 
 .extra-large-chart h6 {
-  font-size: 1.5rem !important;
-  margin-bottom: 32px;
+  font-size: 1.4rem !important;
+  margin-bottom: 24px;
 }
 
 /* Loading states for charts */
@@ -945,7 +895,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 400px;
+  min-height: 350px;
   background: rgba(255, 255, 255, 0.8);
   border-radius: var(--border-radius);
 }
@@ -955,7 +905,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 400px;
+  min-height: 350px;
   background: rgba(254, 226, 226, 0.8);
   border-radius: var(--border-radius);
   border: 1px solid rgba(248, 113, 113, 0.3);

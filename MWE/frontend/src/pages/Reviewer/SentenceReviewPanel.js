@@ -256,6 +256,127 @@ export default function SentenceReviewPanel() {
             setIsReviewSubmitting(false);
         }
     };
+
+        // Add these new handler functions after your existing handlers
+
+    const handleSentenceApprove = async () => {
+        if (!selectedSentenceData) return;
+        
+        const url = `http://127.0.0.1:5001/reviewer/sentence/${selectedSentenceData._id}/approve`;
+        
+        setIsReviewSubmitting(true);
+
+        try {
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    reviewerUsername: username,
+                    comments: reviewComments.trim()
+                }), 
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to approve sentence.');
+            }
+
+            showSnackbar(`Sentence approved successfully. ${data.approved_tags_count || 0} tags auto-approved.`, 'success');
+            
+            // Refresh the data
+            setSelectedSentenceData(null);
+            setReviewComments('');
+            await fetchSentencesForReview(false);
+            
+        } catch (error) {
+            console.error('Sentence approval error:', error);
+            showSnackbar(`Sentence approval failed: ${error.message}.`, 'error');
+        } finally {
+            setIsReviewSubmitting(false);
+        }
+    };
+
+    const handleSentenceReject = async () => {
+        if (!selectedSentenceData) return;
+        
+        // CRITICAL VALIDATION: Comments required for rejection
+        if (!reviewComments.trim()) {
+            showSnackbar("Comments are required to reject a sentence.", 'warning');
+            return;
+        }
+
+        const url = `http://127.0.0.1:5001/reviewer/sentence/${selectedSentenceData._id}/reject`;
+        
+        setIsReviewSubmitting(true);
+
+        try {
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    reviewerUsername: username,
+                    comments: reviewComments.trim()
+                }), 
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to reject sentence.');
+            }
+
+            showSnackbar(`Sentence rejected successfully. ${data.rejected_tags_count || 0} tags auto-rejected.`, 'success');
+            
+            // Refresh the data
+            setSelectedSentenceData(null);
+            setReviewComments('');
+            await fetchSentencesForReview(false);
+            
+        } catch (error) {
+            console.error('Sentence rejection error:', error);
+            showSnackbar(`Sentence rejection failed: ${error.message}.`, 'error');
+        } finally {
+            setIsReviewSubmitting(false);
+        }
+    };
+
+    const handleUndoSentenceReview = async () => {
+        if (!selectedSentenceData) return;
+        
+        const url = `http://127.0.0.1:5001/reviewer/sentence/${selectedSentenceData._id}/undo-review`;
+        
+        setIsReviewSubmitting(true);
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    reviewerUsername: username 
+                }), 
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to undo sentence review.');
+            }
+
+            showSnackbar(`Sentence review undone successfully. ${data.reset_tags_count || 0} tags reset to pending.`, 'success');
+            
+            // Refresh the data
+            setSelectedSentenceData(null);
+            setReviewComments('');
+            await fetchSentencesForReview(false);
+            
+        } catch (error) {
+            console.error('Undo sentence review error:', error);
+            showSnackbar(`Undo failed: ${error.message}.`, 'error');
+        } finally {
+            setIsReviewSubmitting(false);
+        }
+    };
     // --- Handlers ---
     const handleLogout = async () => { 
         try {
@@ -326,11 +447,18 @@ export default function SentenceReviewPanel() {
         const hasTags = sentenceData.tags && sentenceData.tags.length > 0;
         const currentStatus = sentenceData.review_status || 'Pending'; 
         const isAnnotated = sentenceData.is_annotated;
-        const hasNoTagsAndPending = !hasTags && currentStatus === 'Pending';
-
+        
+        // Calculate tag statistics
+        const pendingTagsCount = sentenceData.tags.filter(t => t.review_status === 'Pending').length;
+        const approvedTagsCount = sentenceData.tags.filter(t => t.review_status === 'Approved').length;
+        const rejectedTagsCount = sentenceData.tags.filter(t => t.review_status === 'Rejected').length;
+        
+        const hasMixedStatus = approvedTagsCount > 0 && rejectedTagsCount > 0;
+      
         const statusColor = currentStatus === 'Approved' ? 'success' : 
-                             currentStatus === 'Rejected' ? 'error' : 'warning';
-                                
+                            currentStatus === 'Rejected' ? 'error' : 
+                            currentStatus === 'Partially Approved' ? 'warning' : 'warning';
+                                    
         return (
             <Box>
                 {/* Status and Text (Sentence Level) */}
@@ -351,16 +479,44 @@ export default function SentenceReviewPanel() {
                             size="small"
                         />
                         {hasTags && (
-                            <Chip 
-                                label={`${sentenceData.tags.length} tags`} 
-                                color="primary" 
-                                size="small"
-                            />
+                            <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                {approvedTagsCount > 0 && (
+                                    <Chip 
+                                        label={`${approvedTagsCount} approved`} 
+                                        size="small" 
+                                        color="success" 
+                                        variant="outlined"
+                                    />
+                                )}
+                                {rejectedTagsCount > 0 && (
+                                    <Chip 
+                                        label={`${rejectedTagsCount} rejected`} 
+                                        size="small" 
+                                        color="error" 
+                                        variant="outlined"
+                                    />
+                                )}
+                                {pendingTagsCount > 0 && (
+                                    <Chip 
+                                        label={`${pendingTagsCount} pending`} 
+                                        size="small" 
+                                        color="warning" 
+                                        variant="outlined"
+                                    />
+                                )}
+                            </Box>
                         )}
                     </Box>
                 </Box>
                 
                 <Divider sx={{ mb: 2 }} />
+                
+                {/* Mixed Status Alert */}
+                {hasMixedStatus && (
+                    <Alert severity="warning" sx={{ mb: 2 }}>
+                        This sentence has both approved and rejected tags. Review individual tags carefully.
+                    </Alert>
+                )}
                 
                 {/* Tags Section */}
                 <Typography variant="subtitle1" color="primary" gutterBottom>
@@ -534,135 +690,248 @@ export default function SentenceReviewPanel() {
                 
                 <Divider sx={{ my: 3 }} />
 
-                {/* REVIEWER NOTES TEXT FIELD */}
-                
+                {/* SENTENCE-LEVEL ACTIONS */}
+                <Typography variant="subtitle1" color="primary" gutterBottom>
+                    Sentence-Level Review Actions:
+                </Typography>
+
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+                    {currentStatus === 'Pending' && (
+                        <>
+                            <Button 
+                                variant="outlined" 
+                                color="error"
+                                onClick={handleSentenceReject}
+                                disabled={isReviewSubmitting}
+                                startIcon={isReviewSubmitting ? <CircularProgress size={16} /> : <CancelIcon />}
+                            >
+                                Reject Entire Sentence
+                            </Button>
+                            <Button 
+                                variant="contained" 
+                                color="success"
+                                onClick={handleSentenceApprove}
+                                disabled={isReviewSubmitting}
+                                startIcon={isReviewSubmitting ? <CircularProgress size={16} /> : <CheckCircleIcon />}
+                            >
+                                Approve Entire Sentence
+                            </Button>
+                        </>
+                    )}
+                    
+                    {currentStatus === 'Partially Approved' && (
+                        <Alert severity="warning" sx={{ width: '100%' }}>
+                            This sentence has mixed tag status. Use individual tag actions or sentence-level actions below.
+                        </Alert>
+                    )}
+                    
+                    {(currentStatus === 'Approved' || currentStatus === 'Rejected' || currentStatus === 'Partially Approved') && (
+                        <>
+                            <Chip 
+                                label={`Sentence ${currentStatus}`} 
+                                color={
+                                    currentStatus === 'Approved' ? 'success' : 
+                                    currentStatus === 'Rejected' ? 'error' : 'warning'
+                                }
+                                variant="outlined"
+                                sx={{ fontWeight: 'bold' }}
+                            />
+                            <Button 
+                                variant="outlined" 
+                                color="warning"
+                                onClick={handleUndoSentenceReview}
+                                disabled={isReviewSubmitting}
+                                startIcon={isReviewSubmitting ? <CircularProgress size={16} /> : <UndoIcon />}
+                            >
+                                Reset to Pending
+                            </Button>
+                        </>
+                    )}
+                </Box>
+
+                {/* SENTENCE-LEVEL COMMENTS */}
+                <TextField
+                    fullWidth
+                    multiline
+                    rows={2}
+                    value={reviewComments}
+                    onChange={(e) => setReviewComments(e.target.value)}
+                    placeholder={
+                        currentStatus === 'Pending' ? "Enter comments for sentence review (required for rejection)..." :
+                        currentStatus === 'Rejected' ? `Rejection reason: ${sentenceData.review_comments || 'No reason provided'}` :
+                        currentStatus === 'Approved' ? `Approval comments: ${sentenceData.review_comments || 'No comments provided'}` :
+                        "Enter review comments..."
+                    }
+                    variant="outlined"
+                    sx={{ mb: 2 }}
+                    disabled={isReviewSubmitting || (currentStatus !== 'Pending')}
+                    error={currentStatus === 'Rejected' && !reviewComments.trim()}
+                    helperText={
+                        currentStatus === 'Rejected' && !reviewComments.trim() ? 
+                        "Comment is required for rejection" : 
+                        "Comments will be applied to all tags in the sentence"
+                    }
+                />
             </Box>
         );
     };
 
     const renderSentenceBox = (sentence) => {
-    // --- Custom Pastel Color Definition ---
-    const PASTEL_GREEN_HEX = '#E8F5E9'; // Very light pastel green for Approved background
-    const PASTEL_ACCENT_HEX = '#C8E6C9'; // Slightly deeper pastel green for Approved border
+        // --- Custom Pastel Color Definition ---
+        const PASTEL_GREEN_HEX = '#E8F5E9'; 
+        const PASTEL_ACCENT_HEX = '#C8E6C9'; 
 
-    const PASTEL_BLUE_HEX = '#E3F2FD'; // Light pastel blue for Annotated-Pending background
-    const PASTEL_BLUE_ACCENT_HEX = '#90CAF9'; // Deeper pastel blue for Annotated-Pending border
+        const PASTEL_BLUE_HEX = '#E3F2FD'; 
+        const PASTEL_BLUE_ACCENT_HEX = '#90CAF9'; 
 
-    // --- UPDATED LOGIC FOR VISUAL STATUS ---
-    const pendingTagsCount = sentence.tags.filter(t => t.review_status === 'Pending').length;
-    const approvedTagsCount = sentence.tags.filter(t => t.review_status === 'Approved').length;
+        const PASTEL_YELLOW_HEX = '#FFF9C4'; 
+        const PASTEL_YELLOW_ACCENT_HEX = '#FFEB3B'; 
 
-    // Determine the effective status for display on the list
-    let effectiveReviewStatus = sentence.review_status || 'Pending';
-    
-    // 1. If pending tags exist, it must be 'Pending'.
-    if (pendingTagsCount > 0) {
-        effectiveReviewStatus = 'Pending'; 
-    } 
-    // 2. If all tags are approved, it's 'Approved'.
-    else if (approvedTagsCount > 0 && pendingTagsCount === 0) {
-        effectiveReviewStatus = 'Approved'; 
-    } 
-    // 3. Otherwise, use the DB status (which might be 'Rejected' or 'Pending')
-    else {
-        effectiveReviewStatus = sentence.review_status || 'Pending';
-    }
+        // --- UPDATED LOGIC FOR MIXED STATUS VISUALIZATION ---
+        const pendingTagsCount = sentence.tags.filter(t => t.review_status === 'Pending').length;
+        const approvedTagsCount = sentence.tags.filter(t => t.review_status === 'Approved').length;
+        const rejectedTagsCount = sentence.tags.filter(t => t.review_status === 'Rejected').length;
 
-    // --- NEW COLOR ASSIGNMENT LOGIC ---
-    let accentColor = theme.palette.grey[300]; 
-    let backgroundColor = theme.palette.common.white;
-    
-    // Determine if the sentence is in the special Annotated & Pending state
-    const isAnnotatedAndPending = sentence.is_annotated && effectiveReviewStatus === 'Pending';
+        // Determine the effective status for display on the list
+        let effectiveReviewStatus = sentence.review_status || 'Pending';
+        
+        // 1. If pending tags exist, it must be 'Pending'.
+        if (pendingTagsCount > 0) {
+            effectiveReviewStatus = 'Pending'; 
+        } 
+        // 2. If all tags are approved, it's 'Approved'.
+        else if (approvedTagsCount > 0 && pendingTagsCount === 0 && rejectedTagsCount === 0) {
+            effectiveReviewStatus = 'Approved'; 
+        }
+        // 3. If all tags are rejected, it's 'Rejected'.
+        else if (rejectedTagsCount > 0 && pendingTagsCount === 0 && approvedTagsCount === 0) {
+            effectiveReviewStatus = 'Rejected';
+        }
+        // 4. If mixed approved and rejected tags, it's 'Partially Approved'.
+        else if (approvedTagsCount > 0 && rejectedTagsCount > 0 && pendingTagsCount === 0) {
+            effectiveReviewStatus = 'Partially Approved';
+        }
+        // 5. Otherwise, use the DB status
+        else {
+            effectiveReviewStatus = sentence.review_status || 'Pending';
+        }
 
-    // Condition 1: Approved (Pastel Green)
-    if (effectiveReviewStatus === 'Approved') {
-        accentColor = PASTEL_ACCENT_HEX; 
-        backgroundColor = PASTEL_GREEN_HEX;
-    } 
-    // Condition 2: Annotated but Still Pending (Pastel Blue)
-    else if (isAnnotatedAndPending) {
-        accentColor = PASTEL_BLUE_ACCENT_HEX; 
-        backgroundColor = PASTEL_BLUE_HEX;
-    }
-    // Condition 3: Pending/Non-Annotated (Orange/Warning Color)
-    else if (effectiveReviewStatus === 'Pending') {
-        accentColor = theme.palette.warning.main; 
-        backgroundColor = theme.palette.common.white;
-    } 
-    // Condition 4: Rejected (Error Color, White Background)
-    else if (effectiveReviewStatus === 'Rejected') {
-        accentColor = theme.palette.error.main; 
-        backgroundColor = theme.palette.common.white;
-    }
-    
-    const isSelected = selectedSentenceData?._id === sentence._id;
+        // --- ENHANCED COLOR ASSIGNMENT LOGIC ---
+        let accentColor = theme.palette.grey[300]; 
+        let backgroundColor = theme.palette.common.white;
+        
+        // Determine if the sentence is in the special Annotated & Pending state
+        const isAnnotatedAndPending = sentence.is_annotated && effectiveReviewStatus === 'Pending';
 
-    // --- CHIP COLOR LOGIC ---
-    let chipColor;
-    if (isAnnotatedAndPending) {
-        // Use primary color (blue) for the Annotated Pending chip
-        chipColor = 'primary';
-    } else if (effectiveReviewStatus === 'Approved') {
-        chipColor = 'success';
-    } else if (effectiveReviewStatus === 'Rejected') {
-        chipColor = 'error';
-    } else {
-        // Use warning color (orange) for standard Pending/non-annotated sentences
-        chipColor = 'warning';
-    }
+        // Condition 1: Approved (Pastel Green)
+        if (effectiveReviewStatus === 'Approved') {
+            accentColor = PASTEL_ACCENT_HEX; 
+            backgroundColor = PASTEL_GREEN_HEX;
+        } 
+        // Condition 2: Partially Approved (Pastel Yellow)
+        else if (effectiveReviewStatus === 'Partially Approved') {
+            accentColor = PASTEL_YELLOW_ACCENT_HEX; 
+            backgroundColor = PASTEL_YELLOW_HEX;
+        }
+        // Condition 3: Annotated but Still Pending (Pastel Blue)
+        else if (isAnnotatedAndPending) {
+            accentColor = PASTEL_BLUE_ACCENT_HEX; 
+            backgroundColor = PASTEL_BLUE_HEX;
+        }
+        // Condition 4: Pending/Non-Annotated (Orange/Warning Color)
+        else if (effectiveReviewStatus === 'Pending') {
+            accentColor = theme.palette.warning.main; 
+            backgroundColor = theme.palette.common.white;
+        } 
+        // Condition 5: Rejected (Error Color, White Background)
+        else if (effectiveReviewStatus === 'Rejected') {
+            accentColor = theme.palette.error.main; 
+            backgroundColor = theme.palette.common.white;
+        }
+        
+        const isSelected = selectedSentenceData?._id === sentence._id;
 
-    return (
-        <Paper
-            key={sentence._id}
-            onClick={() => handleSentenceClick(sentence)} 
-            elevation={isSelected ? 3 : 1}
-            sx={{
-                p: 2, mb: 2, cursor: 'pointer', 
-                // Use the determined background color
-                backgroundColor: isSelected 
-                    ? theme.palette.action.selected 
-                    : backgroundColor,
-                // Use the determined accent color
-                borderLeft: `5px solid ${accentColor}`,
-                borderRight: isSelected ? `2px solid ${accentColor}` : 'none',
-                '&:hover': { backgroundColor: theme.palette.action.hover, boxShadow: theme.shadows[2] },
-                transition: 'all 0.2s ease-in-out'
-            }}
-        >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <Typography 
-                    variant="body1" 
-                    sx={{ 
-                        fontWeight: 500, color: theme.palette.text.primary,
-                        wordBreak: 'break-word', flex: 1
-                    }}
-                >
-                    {sentence.textContent}
-                </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5, ml: 1 }}>
-                    <Chip 
-                        // The chip status uses the effectiveReviewStatus for consistency
-                        label={effectiveReviewStatus}
-                        size="small" 
-                        // Use the new calculated chipColor
-                        color={chipColor} 
-                        variant="filled"
-                        sx={{ minWidth: 80, fontWeight: 'bold' }}
-                    />
-                    {sentence.tags && sentence.tags.length > 0 && (
+        // --- ENHANCED CHIP COLOR LOGIC ---
+        let chipColor;
+        if (isAnnotatedAndPending) {
+            chipColor = 'primary';
+        } else if (effectiveReviewStatus === 'Approved') {
+            chipColor = 'success';
+        } else if (effectiveReviewStatus === 'Partially Approved') {
+            chipColor = 'warning';
+        } else if (effectiveReviewStatus === 'Rejected') {
+            chipColor = 'error';
+        } else {
+            chipColor = 'warning';
+        }
+
+        return (
+            <Paper
+                key={sentence._id}
+                onClick={() => handleSentenceClick(sentence)} 
+                elevation={isSelected ? 3 : 1}
+                sx={{
+                    p: 2, mb: 2, cursor: 'pointer', 
+                    backgroundColor: isSelected 
+                        ? theme.palette.action.selected 
+                        : backgroundColor,
+                    borderLeft: `5px solid ${accentColor}`,
+                    borderRight: isSelected ? `2px solid ${accentColor}` : 'none',
+                    '&:hover': { backgroundColor: theme.palette.action.hover, boxShadow: theme.shadows[2] },
+                    transition: 'all 0.2s ease-in-out'
+                }}
+            >
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Typography 
+                        variant="body1" 
+                        sx={{ 
+                            fontWeight: 500, color: theme.palette.text.primary,
+                            wordBreak: 'break-word', flex: 1
+                        }}
+                    >
+                        {sentence.textContent}
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5, ml: 1 }}>
                         <Chip 
-                            label={`${sentence.tags.length} tags`} 
+                            label={effectiveReviewStatus}
                             size="small" 
-                            color="primary" 
-                            variant="outlined"
+                            color={chipColor} 
+                            variant="filled"
+                            sx={{ minWidth: 80, fontWeight: 'bold' }}
                         />
-                    )}
+                        {sentence.tags && sentence.tags.length > 0 && (
+                            <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                {approvedTagsCount > 0 && (
+                                    <Chip 
+                                        label={`${approvedTagsCount}✓`} 
+                                        size="small" 
+                                        color="success" 
+                                        variant="outlined"
+                                    />
+                                )}
+                                {rejectedTagsCount > 0 && (
+                                    <Chip 
+                                        label={`${rejectedTagsCount}✗`} 
+                                        size="small" 
+                                        color="error" 
+                                        variant="outlined"
+                                    />
+                                )}
+                                {pendingTagsCount > 0 && (
+                                    <Chip 
+                                        label={`${pendingTagsCount}?`} 
+                                        size="small" 
+                                        color="warning" 
+                                        variant="outlined"
+                                    />
+                                )}
+                            </Box>
+                        )}
+                    </Box>
                 </Box>
-            </Box>
-        </Paper>
-    );
-};
+            </Paper>
+        );
+    };
     // --- END UPDATED LOGIC ---
 
     if (isLoading) {

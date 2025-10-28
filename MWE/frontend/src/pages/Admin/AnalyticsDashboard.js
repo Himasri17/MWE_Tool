@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import {  useParams } from 'react-router-dom';
 import {
     Box, Typography, Paper, Grid, Card, CardContent, Button,
     FormControl, InputLabel, Select, MenuItem, TextField,
@@ -32,6 +32,9 @@ import {
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getAuthHeaders, removeToken } from '../../components/authUtils';
+import './AnalyticsDashboard.css'; 
+
+
 
 // Color palette for the new design
 const COLOR_PALETTE = {
@@ -494,7 +497,7 @@ const AnalyticsDashboard = () => {
                                             sx={{ background: COLOR_PALETTE.gradient.primary, color: 'white' }}
                                         />
                                     </Box>
-                                    <ResponsiveContainer width="100%" height={300}>
+                                    <ResponsiveContainer width="100%" height="100%">
                                         <AreaChart data={timelineData}>
                                             <defs>
                                                 <linearGradient id="colorAnnotations" x1="0" y1="0" x2="0" y2="1">
@@ -1030,26 +1033,27 @@ const AnalyticsDashboard = () => {
 
 
     const renderPerformanceAnalytics = () => {
-        const userData = comprehensiveData?.user_performance || analyticsData?.user_distribution || [];
-        
-        return (
-            <Grid container spacing={3}>
-                <Grid item xs={12} md={8}>
-                    <Paper 
-                        sx={{ 
-                            p: 3, 
-                            borderRadius: 3,
-                            height: 520,
-                            minHeight: 520,
-                            display: 'flex',
-                            flexDirection: 'column'
-                        }}
-                        className="chart-container"     
-                        >
-                        <Typography variant="h6" fontWeight="700" gutterBottom>
-                            User Performance Distribution
-                        </Typography>
-                        <ResponsiveContainer width="100%" height="90%">
+    const userData = comprehensiveData?.user_performance || analyticsData?.user_distribution || [];
+    
+    return (
+        <Grid container spacing={3}>
+            <Grid item xs={12} md={8}>
+                <Paper 
+                    sx={{ 
+                        p: 3, 
+                        borderRadius: 3,
+                        height: '100%',
+                        minHeight: 520,
+                        display: 'flex',
+                        flexDirection: 'column'
+                    }}
+                    className="chart-container large-chart"
+                >
+                    <Typography variant="h6" fontWeight="700" gutterBottom>
+                        User Performance Distribution
+                    </Typography>
+                    <Box sx={{ flex: 1, minHeight: 400 }}>
+                        <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={userData.slice(0, 10)}>
                                 <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                                 <XAxis 
@@ -1075,25 +1079,27 @@ const AnalyticsDashboard = () => {
                                 />
                             </BarChart>
                         </ResponsiveContainer>
-                    </Paper>
-                </Grid>
-                
-                <Grid item xs={12} md={4}>
-                   <Paper 
-                        sx={{ 
-                            p: 3, 
-                            borderRadius: 3,
-                            height: 520,
-                            minHeight: 520,
-                            display: 'flex',
-                            flexDirection: 'column'
-                        }}
-                        className="chart-container"
-                        >
-                        <Typography variant="h6" fontWeight="700" gutterBottom>
-                            Performance Radar
-                        </Typography>
-                        <ResponsiveContainer width="100%" height="90%">
+                    </Box>
+                </Paper>
+            </Grid>
+            
+            <Grid item xs={12} md={4}>
+                <Paper 
+                    sx={{ 
+                        p: 3, 
+                        borderRadius: 3,
+                        height: '100%',
+                        minHeight: 520,
+                        display: 'flex',
+                        flexDirection: 'column'
+                    }}
+                    className="chart-container"
+                >
+                    <Typography variant="h6" fontWeight="700" gutterBottom>
+                        Performance Radar
+                    </Typography>
+                    <Box sx={{ flex: 1, minHeight: 400 }}>
+                        <ResponsiveContainer width="100%" height="100%">
                             <RadarChart data={userData.slice(0, 5).map(user => ({
                                 subject: user.username,
                                 annotations: user.total_annotations || user.count,
@@ -1112,29 +1118,41 @@ const AnalyticsDashboard = () => {
                                 />
                             </RadarChart>
                         </ResponsiveContainer>
-                    </Paper>
-                </Grid>
+                    </Box>
+                </Paper>
             </Grid>
-        );
-    };
+        </Grid>
+    );
+};
 
     const renderProjectAnalytics = () => {
-        const chartData = projects.map(project => ({
-            project_name: project.name,
-            total_annotations: project.annotated_count,
-            completion_rate: project.progress_percent,
-            total_sentences: project.total_sentences,
-            status: project.progress_percent === 100 ? 'Completed' : 'In Progress'
-        }));
+    const chartData = projects.map(project => ({
+        project_name: project.name,
+        total_annotations: project.annotated_count,
+        completion_rate: project.progress_percent,
+        total_sentences: project.total_sentences,
+        status: project.progress_percent === 100 ? 'Completed' : 'In Progress'
+    }));
 
-        return (
-            <Grid container spacing={3}>
-                <Grid item xs={12}>
-                    <Paper sx={{ p: 3, borderRadius: 3, height: 500 }}>
-                        <Typography variant="h6" fontWeight="700" gutterBottom>
-                            Project Progress Overview
-                        </Typography>
-                        <ResponsiveContainer width="100%" height="90%">
+    return (
+        <Grid container spacing={3}>
+            <Grid item xs={12}>
+                <Paper 
+                    sx={{ 
+                        p: 3, 
+                        borderRadius: 3,
+                        height: '100%',
+                        minHeight: 500,
+                        display: 'flex',
+                        flexDirection: 'column'
+                    }}
+                    className="chart-container large-chart"
+                >
+                    <Typography variant="h6" fontWeight="700" gutterBottom>
+                        Project Progress Overview
+                    </Typography>
+                    <Box sx={{ flex: 1, minHeight: 400 }}>
+                        <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={chartData}>
                                 <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                                 <XAxis 
@@ -1166,33 +1184,35 @@ const AnalyticsDashboard = () => {
                                 />
                             </BarChart>
                         </ResponsiveContainer>
-                    </Paper>
-                </Grid>
+                    </Box>
+                </Paper>
             </Grid>
-        );
-    };
+        </Grid>
+    );
+};
 
     const renderMWEAnalytics = () => {
-        const mweData = analyticsData?.mwe_types || [];
-        
-        return (
-            <Grid container spacing={3}>
-                <Grid item xs={12} md={7}>
-                    <Paper 
-                        sx={{ 
-                            p: 3, 
-                            borderRadius: 3,
-                            height: 480, // Fixed height
-                            minHeight: 480,
-                            display: 'flex',
-                            flexDirection: 'column'
-                        }}
-                        className="chart-container" // Add this class
-                        >
-                        <Typography variant="h6" fontWeight="700" gutterBottom>
-                            MWE Type Distribution
-                        </Typography>
-                        <ResponsiveContainer width="100%" height="90%">
+    const mweData = analyticsData?.mwe_types || [];
+    
+    return (
+        <Grid container spacing={3}>
+            <Grid item xs={12} md={7}>
+                <Paper 
+                    sx={{ 
+                        p: 3, 
+                        borderRadius: 3,
+                        height: '100%',
+                        minHeight: 480,
+                        display: 'flex',
+                        flexDirection: 'column'
+                    }}
+                    className="chart-container"
+                >
+                    <Typography variant="h6" fontWeight="700" gutterBottom>
+                        MWE Type Distribution
+                    </Typography>
+                    <Box sx={{ flex: 1, minHeight: 350 }}>
+                        <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={mweData.slice(0, 10)}>
                                 <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                                 <XAxis 
@@ -1218,25 +1238,27 @@ const AnalyticsDashboard = () => {
                                 />
                             </BarChart>
                         </ResponsiveContainer>
-                    </Paper>
-                </Grid>
-                
-                <Grid item xs={12} md={5}>
-                    <Paper 
-                        sx={{ 
-                            p: 3, 
-                            borderRadius: 3,
-                            height: 460,
-                            minHeight: 460,
-                            display: 'flex',
-                            flexDirection: 'column'
-                        }}
-                        className="chart-container" 
-                        >
-                        <Typography variant="h6" fontWeight="700" gutterBottom>
-                            MWE Categories
-                        </Typography>
-                        <ResponsiveContainer width="100%" height="90%">
+                    </Box>
+                </Paper>
+            </Grid>
+            
+            <Grid item xs={12} md={5}>
+                <Paper 
+                    sx={{ 
+                        p: 3, 
+                        borderRadius: 3,
+                        height: '100%',
+                        minHeight: 480,
+                        display: 'flex',
+                        flexDirection: 'column'
+                    }}
+                    className="chart-container"
+                >
+                    <Typography variant="h6" fontWeight="700" gutterBottom>
+                        MWE Categories
+                    </Typography>
+                    <Box sx={{ flex: 1, minHeight: 350 }}>
+                        <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie
                                     data={mweData.slice(0, 6)}
@@ -1262,12 +1284,12 @@ const AnalyticsDashboard = () => {
                                 <RechartsTooltip />
                             </PieChart>
                         </ResponsiveContainer>
-                    </Paper>
-                </Grid>
+                    </Box>
+                </Paper>
             </Grid>
-        );
-    };
-
+        </Grid>
+    );
+};
     return (
         <Box className="analytics-dashboard" 
             sx={{ 

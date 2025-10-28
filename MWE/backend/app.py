@@ -641,20 +641,28 @@ def log_reviewer_action(reviewer_username, action_description, annotator_usernam
         user_action = action_description.replace("reviewed", "had work reviewed")
         log_action_and_update_report(annotator_username, user_action)
 
-# Update the update_sentence_review_status function to include logging
+
+
 def update_sentence_review_status(sentence_id):
-    """Update sentence review status based on its tags with enhanced logging"""
+    """Update sentence review status based on its tags with enhanced mixed-status handling"""
     try:
         from bson.objectid import ObjectId
         
         # Count remaining staged tags for this sentence
         remaining_staged_tags = staged_tags_collection.count_documents({
-            "source_sentence_id": sentence_id
+            "source_sentence_id": sentence_id,
+            "review_status": "Pending"  # Only count pending ones
         })
         
         # Count approved tags for this sentence
         approved_tags_count = tags_collection.count_documents({
             "source_sentence_id": sentence_id
+        })
+        
+        # Count rejected tags for this sentence
+        rejected_tags_count = staged_tags_collection.count_documents({
+            "source_sentence_id": sentence_id,
+            "review_status": "Rejected"
         })
         
         # Get current sentence
@@ -666,20 +674,27 @@ def update_sentence_review_status(sentence_id):
         annotator_username = sentence.get('username')
         
         # Determine is_annotated based on the existence of any tags
-        is_annotated = (remaining_staged_tags > 0) or (approved_tags_count > 0) or sentence.get('is_annotated', False)
+        is_annotated = (remaining_staged_tags > 0) or (approved_tags_count > 0) or (rejected_tags_count > 0) or sentence.get('is_annotated', False)
         
-        # Determine the correct status
+        # ENHANCED: Determine the correct status for mixed scenarios
         if remaining_staged_tags > 0:
+            # Some tags still pending review
             new_status = "Pending"
-        elif approved_tags_count > 0:
+        elif approved_tags_count > 0 and rejected_tags_count == 0:
+            # All tags approved, none rejected
             new_status = "Approved"
-        elif current_status == "Approved" and approved_tags_count == 0 and remaining_staged_tags == 0:
-            new_status = "Approved"
+        elif approved_tags_count == 0 and rejected_tags_count > 0:
+            # All tags rejected, none approved
+            new_status = "Rejected"
+        elif approved_tags_count > 0 and rejected_tags_count > 0:
+            # MIXED STATUS: Some approved, some rejected
+            new_status = "Partially Approved"
         else:
-            if is_annotated and approved_tags_count == 0:
-                 new_status = "Rejected"
+            # No tags at all
+            if is_annotated:
+                new_status = "Rejected"
             else:
-                 new_status = "Pending"
+                new_status = "Pending"
 
         # Update the sentence
         sentences_collection.update_one(
@@ -695,10 +710,11 @@ def update_sentence_review_status(sentence_id):
             status_change_msg = f"Sentence status changed from '{current_status}' to '{new_status}'"
             log_action_and_update_report(annotator_username, status_change_msg)
         
-        print(f"Updated sentence {sentence_id} status: {new_status} (approved: {approved_tags_count}, pending: {remaining_staged_tags})")
+        print(f"Updated sentence {sentence_id} status: {new_status} (approved: {approved_tags_count}, rejected: {rejected_tags_count}, pending: {remaining_staged_tags})")
         
     except Exception as e:
-        print(f"Error updating sentence status: {e}")                
+        print(f"Error updating sentence status: {e}")
+        
 # --- API Routes ---
 
 @app.route("/register", methods=["POST"])
@@ -3025,41 +3041,51 @@ def recommend_tags():
 @app.route("/api/analytics/reviewer-stats", methods=["GET"])
 @token_required
 def get_reviewer_stats():
-    """Get reviewer-specific statistics"""
+    """Get reviewer-specific statistics - ENHANCED VERSION"""
     try:
         current_user = request.current_user
         reviewer_username = current_user.get('username')
         
-        # Count total projects with annotations
+        print(f"DEBUG: Fetching stats for reviewer: {reviewer_username}")
+        
+        # Count total projects with annotated sentences
         total_projects = projects_collection.count_documents({})
         
-        # Count total sentences reviewed by this reviewer
-        total_sentences_reviewed = tags_collection.count_documents({
-            "reviewed_by": reviewer_username
+        # FIXED: Count sentences reviewed by this reviewer
+        total_sentences_reviewed = sentences_collection.count_documents({
+            "$or": [
+                {"reviewed_by": reviewer_username},
+                {"review_status": {"$in": ["Approved", "Rejected", "Partially Approved"]}}
+            ]
         })
         
-        # Count pending reviews (staged tags not reviewed by this reviewer)
-        pending_reviews = staged_tags_collection.count_documents({
-            "review_status": "Pending"
+        # FIXED: Count pending reviews (annotated but not reviewed)
+        pending_sentences = sentences_collection.count_documents({
+            "is_annotated": True,
+            "$or": [
+                {"review_status": {"$in": [None, "Pending"]}},
+                {"review_status": {"$exists": False}}
+            ]
         })
         
-        # Calculate review accuracy (approved vs rejected)
-        approved_count = tags_collection.count_documents({
-            "reviewed_by": reviewer_username,
+        # FIXED: Calculate review accuracy
+        approved_count = sentences_collection.count_documents({
             "review_status": "Approved"
         })
-        rejected_count = tags_collection.count_documents({
-            "reviewed_by": reviewer_username, 
+        
+        rejected_count = sentences_collection.count_documents({
             "review_status": "Rejected"
         })
         
         total_reviewed = approved_count + rejected_count
         review_accuracy = (approved_count / total_reviewed * 100) if total_reviewed > 0 else 0
         
+        print(f"DEBUG: Stats - projects: {total_projects}, reviewed: {total_sentences_reviewed}, pending: {pending_sentences}, accuracy: {review_accuracy}%")
+        
         return jsonify({
             "totalProjects": total_projects,
             "totalSentencesReviewed": total_sentences_reviewed,
-            "pendingReviews": pending_reviews,
+            "pendingReviews": pending_sentences,
             "reviewAccuracy": round(review_accuracy, 1)
         }), 200
         
@@ -3071,7 +3097,7 @@ def get_reviewer_stats():
             "pendingReviews": 0,
             "reviewAccuracy": 0
         }), 200
-        
+                   
 @app.route("/api/recommend-tags/text", methods=["POST"])
 def recommend_tags_from_text():
     """
@@ -4103,32 +4129,37 @@ def get_sentences(username):
 
 @app.route("/api/projects/<project_id>/users_and_progress", methods=["GET"])
 def get_project_users_and_progress(project_id):
+    """Get project users and their progress - COMPLETE FIX"""
     try:
-        try:
-            project = projects_collection.find_one({"_id": ObjectId(project_id)})
-        except:
-            project = None
-        
+        project = projects_collection.find_one({"_id": ObjectId(project_id)})
         if not project:
             return jsonify({"error": "Project not found"}), 404
 
-        # Group sentences by username to get individual progress
+        # FIXED: Proper aggregation to get user progress with review status
         pipeline = [
             {"$match": {"project_id": project_id}},
             {"$group": {
                 "_id": "$username",
                 "total": {"$sum": 1},
-                "completed": {"$sum": {"$cond": ["$is_annotated", 1, 0]}}
+                "completed": {"$sum": {"$cond": ["$is_annotated", 1, 0]}},
+                "reviewed": {"$sum": {"$cond": [
+                    {"$in": ["$review_status", ["Approved", "Rejected", "Partially Approved"]]}, 
+                    1, 0
+                ]}}
             }},
             {"$project": {
                 "username": "$_id",
                 "total": 1,
                 "completed": 1,
+                "reviewed": 1,
                 "_id": 0
-            }}
+            }},
+            {"$sort": {"username": 1}}
         ]
         
         user_progress = list(sentences_collection.aggregate(pipeline))
+        
+        print(f"DEBUG: Project {project_id} user progress: {user_progress}")
 
         return jsonify({
             "project_name": project.get("name"),
@@ -4138,7 +4169,6 @@ def get_project_users_and_progress(project_id):
     except Exception as e:
         print(f"Error fetching project user progress: {e}")
         return jsonify({"error": "Internal server error"}), 500
-   
     
 @app.route("/api/projects/<project_id>", methods=["DELETE"])
 def delete_project(project_id):
@@ -4751,11 +4781,269 @@ def reject_tag(tag_id):
         return jsonify({"error": "Internal server error during tag rejection."}), 500  
  
 
+@app.route('/reviewer/sentence/<sentence_id>/approve', methods=["PUT"])
+def approve_sentence(sentence_id):
+    """Approve an entire sentence and all its pending tags - COMPLETE FIX"""
+    try:
+        data = request.json
+        reviewer_username = data.get('reviewerUsername')
+        comments = data.get('comments', '')
+        
+        if not reviewer_username:
+            return jsonify({"message": "Reviewer username is required"}), 400
+        
+        # Get the sentence
+        sentence = sentences_collection.find_one({"_id": ObjectId(sentence_id)})
+        if not sentence:
+            return jsonify({"message": "Sentence not found"}), 404
+            
+        annotator_username = sentence.get('username')
+        project_id = sentence.get('project_id')
+        
+        print(f"DEBUG: Approving sentence {sentence_id} by reviewer {reviewer_username}")
+        
+        # Get all pending tags for this sentence
+        pending_tags = list(staged_tags_collection.find({
+            "source_sentence_id": sentence_id,
+            "review_status": "Pending"
+        }))
+        
+        # Auto-approve all pending tags
+        approved_count = 0
+        for tag in pending_tags:
+            # Create final tag
+            final_tag = {
+                'tag': tag.get('tag'),
+                'source_sentence_id': tag.get('source_sentence_id'),
+                'username': tag.get('username'),
+                'text': tag.get('text'),
+                'annotation_date': tag.get('annotation_date'),
+                'review_status': 'Approved',
+                'review_comments': f"Auto-approved with sentence approval: {comments}",
+                'reviewed_by': reviewer_username,
+                'reviewed_at': datetime.utcnow()
+            }
+            
+            # Insert into final collection
+            tags_collection.insert_one(final_tag)
+            
+            # Remove from staged collection
+            staged_tags_collection.delete_one({"_id": tag["_id"]})
+            approved_count += 1
+        
+        # CRITICAL: Update sentence with ALL required fields
+        update_result = sentences_collection.update_one(
+            {"_id": ObjectId(sentence_id)},
+            {"$set": {
+                "review_status": "Approved",
+                "review_comments": comments,
+                "reviewed_by": reviewer_username,  # This is essential
+                "reviewed_at": datetime.utcnow(),
+                "is_annotated": True
+            }}
+        )
+        
+        print(f"DEBUG: Sentence update result - matched: {update_result.matched_count}, modified: {update_result.modified_count}")
+        
+        # Log the action
+        log_action_and_update_report(
+            reviewer_username, 
+            f"Approved entire sentence and {approved_count} tags by {annotator_username}"
+        )
+        log_action_and_update_report(
+            annotator_username,
+            f"Sentence with {approved_count} tags was approved by reviewer {reviewer_username}"
+        )
+        
+        return jsonify({
+            "message": f"Sentence approved successfully. {approved_count} tags auto-approved.",
+            "approved_tags_count": approved_count
+        }), 200
+        
+    except Exception as e:
+        print(f"Error approving sentence: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "Internal server error during sentence approval"}), 500 
+        
+@app.route('/reviewer/sentence/<sentence_id>/reject', methods=['PUT'])
+def reject_sentence(sentence_id):
+    """Reject an entire sentence and all its pending tags"""
+    try:
+        data = request.json
+        reviewer_username = data.get('reviewerUsername')
+        comments = data.get('comments', '')
+        
+        if not reviewer_username:
+            return jsonify({"message": "Reviewer username is required"}), 400
+        
+        if not comments.strip():
+            return jsonify({"message": "Comments are required to reject a sentence"}), 400
+        
+        # Get the sentence
+        sentence = sentences_collection.find_one({"_id": ObjectId(sentence_id)})
+        if not sentence:
+            return jsonify({"message": "Sentence not found"}), 404
+            
+        annotator_username = sentence.get('username')
+        
+        # Get all pending tags for this sentence
+        pending_tags = list(staged_tags_collection.find({
+            "source_sentence_id": sentence_id,
+            "review_status": "Pending"
+        }))
+        
+        # Auto-reject all pending tags
+        rejected_count = 0
+        for tag in pending_tags:
+            # Mark as rejected in staged collection
+            staged_tags_collection.update_one(
+                {"_id": tag["_id"]},
+                {"$set": {
+                    "review_status": "Rejected",
+                    "review_comments": f"Auto-rejected with sentence rejection: {comments}",
+                    "reviewed_by": reviewer_username,
+                    "reviewed_at": datetime.utcnow()
+                }}
+            )
+            rejected_count += 1
+        
+        # Update sentence status
+        sentences_collection.update_one(
+            {"_id": ObjectId(sentence_id)},
+            {"$set": {
+                "review_status": "Rejected",
+                "review_comments": comments,
+                "reviewed_by": reviewer_username,
+                "reviewed_at": datetime.utcnow()
+            }}
+        )
+        
+        # Log the action
+        log_action_and_update_report(
+            reviewer_username, 
+            f"Rejected entire sentence and {rejected_count} tags by {annotator_username}. Reason: {comments}"
+        )
+        log_action_and_update_report(
+            annotator_username,
+            f"Sentence with {rejected_count} tags was rejected by reviewer {reviewer_username}. Reason: {comments}"
+        )
+        
+        return jsonify({
+            "message": f"Sentence rejected successfully. {rejected_count} tags auto-rejected.",
+            "rejected_tags_count": rejected_count
+        }), 200
+        
+    except Exception as e:
+        print(f"Error rejecting sentence: {e}")
+        return jsonify({"error": "Internal server error during sentence rejection"}), 500
+
+@app.route('/reviewer/sentence/<sentence_id>/undo-review', methods=['POST'])
+def undo_sentence_review(sentence_id):
+    """Undo sentence approval/rejection and reset all tags to pending"""
+    try:
+        data = request.json
+        reviewer_username = data.get('reviewerUsername')
+        
+        if not reviewer_username:
+            return jsonify({"message": "Reviewer username is required"}), 400
+        
+        # Get the sentence
+        sentence = sentences_collection.find_one({"_id": ObjectId(sentence_id)})
+        if not sentence:
+            return jsonify({"message": "Sentence not found"}), 404
+            
+        annotator_username = sentence.get('username')
+        previous_status = sentence.get('review_status')
+        
+        # Get all tags that were approved/rejected for this sentence
+        affected_tags = list(staged_tags_collection.find({
+            "source_sentence_id": sentence_id,
+            "review_status": {"$in": ["Approved", "Rejected"]}
+        }))
+        
+        # Reset all tags to pending
+        reset_count = 0
+        for tag in affected_tags:
+            staged_tags_collection.update_one(
+                {"_id": tag["_id"]},
+                {"$set": {
+                    "review_status": "Pending",
+                    "review_comments": "",
+                    "reviewed_by": "",
+                    "reviewed_at": None
+                }}
+            )
+            reset_count += 1
+        
+        # Also need to handle tags that were moved to final collection (for approved sentences)
+        if previous_status == "Approved":
+            # Find final tags for this sentence and move them back to staged
+            final_tags = list(tags_collection.find({
+                "source_sentence_id": sentence_id
+            }))
+            
+            for tag in final_tags:
+                # Create staged tag from final tag
+                staged_tag = {
+                    'tag': tag.get('tag'),
+                    'source_sentence_id': tag.get('source_sentence_id'),
+                    'username': tag.get('username'),
+                    'text': tag.get('text'),
+                    'annotation_date': tag.get('annotation_date'),
+                    'review_status': 'Pending',
+                    'previous_review': {
+                        'was_approved': True,
+                        'reviewed_by': tag.get('reviewed_by'),
+                        'reviewed_at': tag.get('reviewed_at'),
+                        'review_comments': tag.get('review_comments', ''),
+                        'undone_by': reviewer_username,
+                        'undone_at': datetime.utcnow()
+                    }
+                }
+                
+                # Insert back to staged collection
+                staged_tags_collection.insert_one(staged_tag)
+                
+                # Remove from final collections
+                tags_collection.delete_one({"_id": tag["_id"]})
+                reset_count += 1
+        
+        # Reset sentence status
+        sentences_collection.update_one(
+            {"_id": ObjectId(sentence_id)},
+            {"$set": {
+                "review_status": "Pending",
+                "review_comments": "",
+                "reviewed_by": "",
+                "reviewed_at": None
+            }}
+        )
+        
+        # Log the action
+        log_action_and_update_report(
+            reviewer_username, 
+            f"Undid {previous_status} status for sentence by {annotator_username}. Reset {reset_count} tags."
+        )
+        log_action_and_update_report(
+            annotator_username,
+            f"Sentence review was undone by reviewer {reviewer_username}. {reset_count} tags reset to pending."
+        )
+        
+        return jsonify({
+            "message": f"Sentence review undone successfully. {reset_count} tags reset to pending.",
+            "reset_tags_count": reset_count
+        }), 200
+        
+    except Exception as e:
+        print(f"Error undoing sentence review: {e}")
+        return jsonify({"error": "Internal server error during undo operation"}), 500
     
 @app.route('/tags/<username>', methods=['GET'])
 def get_tags(username):
     """
-    FIXED: Gets all tags (both final and staged) for sentences assigned to the user
+    FIXED: Gets only approved tags for sentences assigned to the user
+    Rejected tags are filtered out and not shown to the user
     """
     try:
         print(f"DEBUG: Fetching tags for user: {username}")
@@ -4773,21 +5061,23 @@ def get_tags(username):
             print(f"DEBUG: No sentences found for user {username}")
             return jsonify([])
         
-        # Get final approved tags
+        # Get final approved tags (ONLY approved ones)
         final_tags = list(tags_collection.find({
-            'source_sentence_id': {'$in': user_sentence_ids}
+            'source_sentence_id': {'$in': user_sentence_ids},
+            'review_status': 'Approved'  # ONLY return approved tags
         }))
         
-        # Get staged/pending tags
+        # Get staged/pending tags (ONLY pending ones, exclude rejected)
         staged_tags = list(staged_tags_collection.find({
-            'source_sentence_id': {'$in': user_sentence_ids}
+            'source_sentence_id': {'$in': user_sentence_ids},
+            'review_status': {'$ne': 'Rejected'}  # Exclude rejected tags
         }))
         
-        print(f"DEBUG: Found {len(final_tags)} final tags and {len(staged_tags)} staged tags")
+        print(f"DEBUG: Found {len(final_tags)} approved tags and {len(staged_tags)} pending tags (rejected tags filtered out)")
         
         user_tags = []
         
-        # Process final tags
+        # Process final approved tags
         for tag in final_tags:
             tag_data = {
                 "_id": str(tag["_id"]),
@@ -4796,27 +5086,29 @@ def get_tags(username):
                 "source_sentence_id": tag.get("source_sentence_id", ""),
                 "username": tag.get("username", ""),
                 "annotation_date": tag.get("annotation_date"),
-                "status": "approved",  # Add status field
+                "status": "approved",
                 "review_status": "Approved"
             }
             user_tags.append(tag_data)
         
-        # Process staged tags
+        # Process staged/pending tags (excluding rejected)
         for tag in staged_tags:
-            tag_data = {
-                "_id": str(tag["_id"]),
-                "text": tag.get("text", ""),
-                "tag": tag.get("tag", ""),
-                "source_sentence_id": tag.get("source_sentence_id", ""),
-                "username": tag.get("username", ""),
-                "annotation_date": tag.get("annotation_date"),
-                "status": "pending",  # Add status field
-                "review_status": tag.get("review_status", "Pending"),
-                "review_comments": tag.get("review_comments", "")
-            }
-            user_tags.append(tag_data)
+            # Double check to exclude any rejected tags that might slip through
+            if tag.get("review_status") != "Rejected":
+                tag_data = {
+                    "_id": str(tag["_id"]),
+                    "text": tag.get("text", ""),
+                    "tag": tag.get("tag", ""),
+                    "source_sentence_id": tag.get("source_sentence_id", ""),
+                    "username": tag.get("username", ""),
+                    "annotation_date": tag.get("annotation_date"),
+                    "status": "pending",
+                    "review_status": tag.get("review_status", "Pending"),
+                    "review_comments": tag.get("review_comments", "")
+                }
+                user_tags.append(tag_data)
         
-        print(f"DEBUG: Returning {len(user_tags)} total tags for user {username}")
+        print(f"DEBUG: Returning {len(user_tags)} total tags for user {username} (rejected tags filtered out)")
         
         return jsonify(user_tags)
         
@@ -4825,7 +5117,7 @@ def get_tags(username):
         import traceback
         traceback.print_exc()
         return jsonify({"error": "Internal server error"}), 500
-       
+        
 @app.route("/sentences/<sentence_id>/status", methods=["PUT"])
 def update_sentence_status(sentence_id):
     data = request.json
