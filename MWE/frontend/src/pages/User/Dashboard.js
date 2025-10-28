@@ -4,11 +4,10 @@ import {
     Container, Typography, TextField, Button, Box, List, ListItem, ListItemText,
     Paper, Dialog, DialogActions, DialogContent,
     DialogContentText, DialogTitle, Chip, CircularProgress, 
-    Grid, LinearProgress, Card, CardContent ,FormControl, InputLabel, Select, MenuItem 
+    Grid, LinearProgress, Card, CardContent ,FormControl, InputLabel, Select, MenuItem, useTheme
 } from "@mui/material";
 import FeedbackIcon from '@mui/icons-material/Feedback'; 
 import {  getToken, removeToken } from '../../components/authUtils'; 
-
 
 
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
@@ -17,6 +16,7 @@ import FeedbackDialog from './FeedbackDialog';
 export default function Dashboard() {
     const { username } = useParams();
     const navigate = useNavigate();
+    const theme = useTheme();
 
     // --- State Management ---
     const [userData, setUserData] = useState(null);
@@ -636,86 +636,87 @@ export default function Dashboard() {
     const getProjectCardColor = (isPending) => isPending ? '#ffcdd2' : '#c8e6c9';
 
     const renderHeaderBar = () => (
-        <Box sx={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            py: 2, 
-            px: 4, 
-            bgcolor: '#e3f2fd', 
-            borderBottom: '1px solid #ddd' 
-        }}>
-            <Typography variant="h5" fontWeight="bold">
+        <Box 
+            sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                height: '60px', 
+                bgcolor: theme.palette.primary.main, 
+                color: 'white', 
+                p: 2, 
+                width: '100%',
+                boxSizing: 'border-box',
+                flexShrink: 0 
+            }}
+        >
+            <Typography variant="h6" fontWeight={500}>
                 MWE Annotator - {userData?.full_name || username || "User"}
             </Typography>
-            <Box sx={{ display: 'flex', gap: 1 }}>
+            
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                 {/* User Guidelines Button */}
                 <Button 
-                    variant="outlined" 
+                    variant="text" 
                     onClick={() => window.open('/MWE Tool - User Guidelines.pdf', '_blank')}
-                    color="primary"
-                    sx={{ 
-                        color: 'black', 
-                        borderColor: 'black',
-                        '&:hover': {
-                            backgroundColor: '#e3f2fd',
-                            borderColor: 'black'
-                        }
-                    }}
+                    sx={{ color: 'white' }}
                 >
                     SHOW USER GUIDELINES
                 </Button>
                 
                 {/* Annotation Guidelines Button */}
                 <Button 
-                    variant="outlined" 
+                    variant="text"
                     onClick={() => window.open('/MWE_Guidelines.pdf', '_blank')}
-                    color="primary"
-                    sx={{ 
-                        color: 'black', 
-                        borderColor: 'black',
-                        '&:hover': {
-                            backgroundColor: '#e3f2fd',
-                            borderColor: 'black'
-                        }
-                    }}
+                    sx={{ color: 'white' }}
                 >
                     SHOW ANNOTATION GUIDELINES
                 </Button>
                 
+                {/* Give Feedback Button */}
                 <Button 
-                    variant="outlined" 
+                    variant="text" 
                     startIcon={<FeedbackIcon />}
                     onClick={() => setIsFeedbackOpen(true)}
-                    color="primary"
+                    sx={{ color: 'white' }}
                 >
                     Give Feedback
                 </Button>
                 
-                {/* Updated Tag Stats Button */}
+                {/* Tag Stats Button */}
                 <Button 
-                    variant="outlined" 
+                    variant="text" 
                     onClick={handleOpenStats}
-                    color="primary"
+                    sx={{ color: 'white' }}
                 >
-                    Tag Stats
+                    TAG STATS
                 </Button>
                 
+                {/* Logout Button (Theme usage fixed here too) */}
                 <Button 
-                    variant="contained" 
-                    color="secondary" 
+                    variant="outlined" 
+                    size="small"
+                    sx={{ 
+                        color: 'white', 
+                        borderColor: 'white', 
+                        '&:hover': { 
+                            backgroundColor: theme.palette.primary.light, // Using theme
+                            borderColor: 'white'
+                        } 
+                    }} 
                     onClick={handleLogout}
                 >
-                    Logout
+                    LOGOUT
                 </Button>
             </Box>
         </Box>
     );
 
-    // --- Render Logic ---
+    // --- Main Render ---
 
     return (
-        <Container maxWidth="xl" sx={{ overflow: 'hidden', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        
+        <Container maxWidth="l" sx={{ overflow: 'hidden', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
             {renderHeaderBar()}
             <Paper elevation={3} sx={{ p: 4, mt: 4, mb: 4, maxHeight: '90vh', overflow: 'hidden' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>

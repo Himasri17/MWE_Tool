@@ -12,6 +12,19 @@ export const removeToken = () => {
     localStorage.removeItem(TOKEN_KEY);
 };
 
+const USERNAME_KEY = 'username'; // Define a constant for consistency
+
+export const setUsername = (username) => {
+    localStorage.setItem(USERNAME_KEY, username);
+    console.log(`[authUtils] SET: Username stored in localStorage under key '${USERNAME_KEY}' with value:`, username);
+};
+
+export const getUsername = () => {
+    const username = localStorage.getItem(USERNAME_KEY);
+    console.log(`[authUtils] GET: Retrieved username from localStorage under key '${USERNAME_KEY}':`, username);
+    return username;
+};
+
 export const getAuthHeaders = () => {
     const token = getToken();
     return {

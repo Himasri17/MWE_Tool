@@ -10,10 +10,10 @@ import PersonIcon from '@mui/icons-material/Person';
 import LockIcon from '@mui/icons-material/Lock';
 import TermsDialog from './TermsDialog';
 import SupportDialog from './SupportDialog';
-import { setToken } from '../../components/authUtils'; 
+import { setToken, setUsername } from '../../components/authUtils';
 
 export default function Login() {
-    const [username, setUsername] = useState('');
+    const [username, setLoginUsername] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
@@ -55,10 +55,20 @@ export default function Login() {
             return;
         }
 
-        // Store JWT token
+        // Login successful and approved: Conditional Navigation
         if (data.token) {
             setToken(data.token);
             console.log('JWT token stored successfully');
+
+            if (data.username) {
+                    // 1. Log the value received from the API
+                    console.log('[Login] Username received from API:', data.username); 
+                    
+                    // 2. Store the username (assuming setUsername is imported and defined as above)
+                    setUsername(data.username); 
+                } else {
+                    console.error('[Login] ERROR: API response is missing the "username" field.');
+                }
         }
 
         // Login successful and approved: Conditional Navigation
@@ -105,7 +115,7 @@ export default function Login() {
                             autoFocus 
                             variant="outlined" 
                             value={username} 
-                            onChange={(e) => setUsername(e.target.value)} 
+                            onChange={(e) => setLoginUsername(e.target.value)}
                             sx={{ mb: 2 }} 
                             InputProps={{ 
                                 startAdornment: (<InputAdornment position="start"><PersonIcon color="action" /></InputAdornment>), 

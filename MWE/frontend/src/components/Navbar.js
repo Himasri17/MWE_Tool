@@ -7,59 +7,60 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 import FeedbackIcon from '@mui/icons-material/Feedback';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
-import AnalyticsIcon from '@mui/icons-material/Analytics'; // Icon for Analytics
-import DashboardIcon from '@mui/icons-material/Dashboard'; // Icon for Dashboard
-import BookIcon from '@mui/icons-material/Book'; // Icon for Logbook
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import BookIcon from '@mui/icons-material/Book';
 
 // Component props interface based on what AdminDashboard passes
 export default function Navbar({
-  username = '',
-  pendingUsersCount = 0,
-  feedbacks = [],
-  onOpenFeedbackDialog = () => {}
+    username = '',
+    pendingUsersCount = 0,
+    feedbacks = [],
+    onOpenFeedbackDialog = () => {}
 }) {
 
     const navigate = useNavigate();
-    const location = useLocation(); // Used to determine the active page
+    const location = useLocation(); 
     const theme = useTheme();
     
     const [drawerOpen, setDrawerOpen] = useState(false);
 
-    // 1. Define all navigation items, paths, and icons
+    // 1. --- CALCULATE AGGREGATED COUNTS ---
+    const unreviewedFeedbacksCount = feedbacks.filter(f => !f.is_reviewed).length;
+    // Total count for the main hamburger badge
+    const totalNotificationCount = pendingUsersCount + unreviewedFeedbacksCount;
+
+    // 2. Define all navigation items, paths, and icons 
     const navItems = [
-        // Path is set to the base admin route which usually represents the project list/dashboard
-        { name: 'DASHBOARD', path: `/admin/${username}`, icon: DashboardIcon }, 
-        { name: 'ANALYTICS', path: `/admin/${username}/analytics`, icon: AnalyticsIcon },
+        { name: 'DASHBOARD', path: `/admin/${username}`, icon: DashboardIcon, badge: 0 }, 
+        { name: 'ANALYTICS', path: `/admin/${username}/analytics`, icon: AnalyticsIcon, badge: 0 },
         { 
             name: 'FEEDBACKS', 
-            path: null, // No direct route, opens a dialog
+            path: null, 
             action: onOpenFeedbackDialog, 
-            badge: feedbacks.filter(f => !f.is_reviewed).length, 
+            badge: unreviewedFeedbacksCount, // Count for the sidebar item
             icon: FeedbackIcon 
         },
-        { name: 'LOGBOOK', path: `/admin/${username}/logbook`, icon: BookIcon },
+        { name: 'LOGBOOK', path: `/admin/${username}/logbook`, icon: BookIcon, badge: 0 },
         { 
             name: 'APPROVE USERS', 
             path: `/admin/${username}/approvals`, 
             icon: GroupAddIcon,
-            badge: pendingUsersCount,
+            badge: pendingUsersCount, // Count for the sidebar item
         },
     ];
     
     // Helper to check if the path is active
     const isPathActive = (path) => {
-        // Special handling for the dashboard path (which is the current component's root)
         if (path === `/admin/${username}`) {
-            // Match exactly or match the root path if no other segment is present
-            return location.pathname === path || location.pathname === `${path}/` || location.pathname === `/admin/${username}/dashboard`;
+            // Checks for /admin/username, /admin/username/, or /admin/username/dashboard
+            return location.pathname === path || location.pathname === `${path}/` || location.pathname.startsWith(`${path}/dashboard`);
         }
-        
-        // For other routes, check if the current path starts with the item's path
         return location.pathname.startsWith(path);
     };
 
     const handleNavigation = (path, action) => {
-        setDrawerOpen(false); // Close drawer first
+        setDrawerOpen(false); 
         if (path) {
             navigate(path);
         } else if (action) {
@@ -67,8 +68,8 @@ export default function Navbar({
         }
     };
     
-    // Simple logout that redirects to the login page (as implemented in AdminDashboard.js)
     const handleLogout = () => {
+        // Since AdminDashboard calls removeToken() before redirecting, this simply navigates
         navigate('/login');
     };
 
@@ -83,7 +84,7 @@ export default function Navbar({
             p: 2, 
             width: '100%',
             boxSizing: 'border-box',
-            flexShrink: 0 // Prevent shrinking
+            flexShrink: 0 
         }}>
             
             {/* LEFT SIDE: HAMBURGER ICON AND TITLE */}
@@ -91,11 +92,19 @@ export default function Navbar({
                 <IconButton
                     color="inherit" 
                     aria-label="open drawer"
-                    onClick={() => setDrawerOpen(true)} // Open the drawer
+                    onClick={() => setDrawerOpen(true)} 
                     edge="start"
                     sx={{ mr: 2 }}
                 >
-                    <MenuIcon /> {/* HAMBURGER ICON */}
+                    {/* 3. --- BADGE ON HAMBURGER ICON --- */}
+                    <Badge 
+                        badgeContent={totalNotificationCount} 
+                        color="error" // Red color for high visibility
+                        overlap="circular" 
+                        max={99} 
+                    >
+                        <MenuIcon /> 
+                    </Badge>
                 </IconButton>
                 <Typography variant="h6" fontWeight={500}>
                     Multiword Expression Workbench
@@ -141,7 +150,6 @@ export default function Navbar({
                                 button 
                                 onClick={() => handleNavigation(item.path, item.action)}
                                 sx={{ 
-                                    // Highlight the active tab in the list (Active tab highlight)
                                     bgcolor: isActive ? theme.palette.action.selected : 'transparent',
                                     '&:hover': {
                                         bgcolor: theme.palette.action.hover,
@@ -149,10 +157,12 @@ export default function Navbar({
                                 }}
                             >
                                 <ListItemIcon>
+                                    {/* Sidebar Item Badge */}
                                     <Badge 
                                         badgeContent={item.badge} 
-                                        color="error"
+                                        color={item.name === 'APPROVE USERS' ? 'error' : 'warning'} 
                                         overlap="circular"
+                                        max={99}
                                     >
                                         {ButtonIcon && <ButtonIcon sx={{ color: isActive ? theme.palette.primary.main : theme.palette.text.secondary }} />}
                                     </Badge>
