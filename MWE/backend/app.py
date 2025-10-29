@@ -318,7 +318,7 @@ Sentence Annotation System Team
         print(f"Failed to send admin welcome email: {e}")
         
 def update_session_history_report(username_to_update):
-    """Recalculates and saves the session history for a specific user with enhanced tracking"""
+    """Recalculates and saves the session history for a specific user with proper logout handling"""
     logs_list = []
     UTC = ZoneInfo("UTC")
     IST = ZoneInfo("Asia/Kolkata")
@@ -335,12 +335,14 @@ def update_session_history_report(username_to_update):
         utc_ts = act['timestamp']
         
         if desc == "Login":
+            # Close previous session if exists
             if session:
                 # Only add session if it has real tasks OR was properly closed
                 if session["tasksDone"] or session["logoutTimeIST"]:
                     logs_list.append(session)
-                # Otherwise, discard empty active sessions
-                # REMOVED: session["tasksDone"].append("Session ended with no tasks")
+                # Otherwise, discard empty active sessions that were never properly closed
+                elif not session["logoutTimeIST"]:
+                    print(f"DEBUG: Discarding unclosed session for {username_to_update} at login")
             
             login_ist = utc_ts.replace(tzinfo=UTC).astimezone(IST)
             session = {
@@ -355,12 +357,9 @@ def update_session_history_report(username_to_update):
             logout_ist = utc_ts.replace(tzinfo=UTC).astimezone(IST)
             session["logoutTimeIST"] = logout_ist.strftime('%d/%m/%Y, %H:%M:%S')
             
-            # Only add to logs if session has real tasks
-            if session["tasksDone"]:
-                logs_list.append(session)
-            # REMOVED: else: session["tasksDone"].append("Session ended with no tasks")
-            
-            session = None
+            # Always add session when logout is recorded, even if no tasks
+            logs_list.append(session)
+            session = None  # Clear the session after logout
             
         elif session and desc not in ["Login", "Logout"]:
             # Add real task to current session, avoiding duplicates
@@ -368,14 +367,20 @@ def update_session_history_report(username_to_update):
                 session["tasksDone"].append(desc)
     
     # Handle the last session if it wasn't closed (active session)
-    if session:
-        # Only keep active sessions that have real tasks
-        if session["tasksDone"]:
+    if session and not session["logoutTimeIST"]:
+        # Check if this session has any real activities
+        hasRealActivities = any(task not in ["Session ended with no tasks", "Active session - no tasks recorded"] 
+                              for task in session["tasksDone"])
+        
+        if hasRealActivities:
+            # Only keep active sessions that have real activities
             logs_list.append(session)
-        # REMOVED: Automatic addition of "Active session - no tasks recorded"
+            print(f"DEBUG: Keeping active session for {username_to_update} with real activities")
+        else:
+            print(f"DEBUG: Discarding inactive session for {username_to_update} with no real activities")
 
     # Sort sessions by login time (newest first)
-    sorted_sessions = sorted(logs_list, key=lambda s: s.get('loginTimeIST', ''), reverse=True)
+    sorted_sessions = sorted(logs_list, key=lambda s: datetime.strptime(s.get('loginTimeIST', '01/01/1970, 00:00:00'), '%d/%m/%Y, %H:%M:%S'), reverse=True)
     
     # Update the session history
     user_session_history_collection.update_one(
@@ -383,8 +388,8 @@ def update_session_history_report(username_to_update):
         {'$set': {'sessions': sorted_sessions}},
         upsert=True
     )
-    print(f"User session history for '{username_to_update}' has been updated with {len(sorted_sessions)} real sessions.")
-         
+    print(f"User session history for '{username_to_update}' has been updated with {len(sorted_sessions)} sessions.")
+
 def log_action_and_update_report(username, description):
     """Logs a new raw event and triggers a rebuild of that user's session history report. (UNCHANGED)"""
     user_activities_collection.update_one(
@@ -722,6 +727,25 @@ def update_sentence_review_status(sentence_id):
         
 # --- API Routes ---
 
+@app.route("/api/log-action", methods=["POST"])
+@token_required
+def log_user_action():
+    """Endpoint for logging user actions from the frontend"""
+    try:
+        data = request.json
+        username = data.get("username")
+        description = data.get("description")
+        
+        if not username or not description:
+            return jsonify({"error": "Username and description are required"}), 400
+            
+        log_action_and_update_report(username, description)
+        return jsonify({"message": "Action logged successfully"}), 200
+        
+    except Exception as e:
+        print(f"Error logging action: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+    
 @app.route("/register", methods=["POST"])
 def register():
     """Handles user registration with IST timestamps."""
@@ -1415,7 +1439,7 @@ def check_role():
 
 @app.route("/logout", methods=["POST"])
 def logout():
-    """Handles user logout - modified to work even with expired tokens"""
+    """Handles user logout - enhanced to ensure session closure"""
     try:
         data = request.json
         username = data.get("username")
@@ -1424,7 +1448,7 @@ def logout():
         token = None
         auth_header = request.headers.get('Authorization')
         if auth_header and auth_header.startswith('Bearer '):
-            token = auth_header.split(' ')[1]
+            token = auth_header.split(' ')['1']
         
         if token:
             # Try to verify, but continue even if token is invalid
@@ -1436,9 +1460,11 @@ def logout():
                 print(f"Token verification failed during logout: {e}")
                 # Continue with logout even if token is invalid
         
-        # Always log the logout action
+        # Always log the logout action and force session update
         if username:
             log_action_and_update_report(username, 'Logout')
+            # Force immediate session history update
+            update_session_history_report(username)
             
         return jsonify({"message": "Logout successful"})
         
@@ -3895,7 +3921,7 @@ def download_project_data(project_id):
                 output_lines.append("="*80)
                 output_lines.append("")
             
-            if report_type == "statistics":
+            if report_type == "statistics": 
                 # Statistics-only report
                 output_lines.append("PROJECT STATISTICS SUMMARY")
                 output_lines.append("")
@@ -4467,19 +4493,35 @@ def get_project_sentences(project_id):
 def get_activity_logs(username):
     """Fetches activity history for the given username (admin required)."""
     try:
-        user = users_collection.find_one({"username": username})
-        if not user or user.get("role") != "admin":
+        # Authorization check - the requesting user must be admin
+        requesting_user = users_collection.find_one({"username": username})
+        if not requesting_user or requesting_user.get("role") != "admin":
             return jsonify({"message": "Unauthorized access"}), 403
 
+        # Get target username from query parameter (if provided)
+        target_username = request.args.get('target_user')
+        
         all_history = []
-        # Loop through all users' session histories
-        for user_doc in user_session_history_collection.find():
-            for session in user_doc.get('sessions', []):
-                all_history.append({
-                    "id": f"{user_doc['username']}_{session.get('loginTimeIST', '')}",
-                    "username": user_doc['username'],
-                    **session
-                })
+        
+        if target_username:
+            # Fetch logs for specific user
+            user_doc = user_session_history_collection.find_one({"username": target_username})
+            if user_doc:
+                for session in user_doc.get('sessions', []):
+                    all_history.append({
+                        "id": f"{user_doc['username']}_{session.get('loginTimeIST', '')}",
+                        "username": user_doc['username'],
+                        **session
+                    })
+        else:
+            # Fetch logs for ALL users (current behavior)
+            for user_doc in user_session_history_collection.find():
+                for session in user_doc.get('sessions', []):
+                    all_history.append({
+                        "id": f"{user_doc['username']}_{session.get('loginTimeIST', '')}",
+                        "username": user_doc['username'],
+                        **session
+                    })
 
         # Sort by login time, descending
         all_history.sort(key=lambda x: datetime.strptime(x['loginTimeIST'], '%d/%m/%Y, %H:%M:%S') if x['loginTimeIST'] else datetime.min, reverse=True)
@@ -4488,7 +4530,7 @@ def get_activity_logs(username):
     except Exception as e:
         print(f"Error fetching activity logs: {e}")
         return jsonify({"error": "Internal server error"}), 500
-    
+     
     
 @app.route('/sentences/<sentence_id>/tags/<tag_id>', methods=['DELETE'])
 def remove_tag_from_sentence(sentence_id, tag_id):

@@ -329,6 +329,21 @@ export default function Dashboard() {
         }
     }, [selectedSentence, currentSentenceTags]);
 
+    const logUserAction = async (description) => {
+    try {
+        await fetchWithAuth('http://127.0.0.1:5001/api/log-action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: username,
+                description: description
+            })
+        });
+    } catch (error) {
+        console.error('Failed to log action:', error);
+    }
+};
+
     const fetchTagRecommendations = async (text) => {
         if (!text || text.trim().length < 2) {
             // Don't clear auto-detected tags, only clear API recommendations
@@ -400,59 +415,69 @@ export default function Dashboard() {
     };
 
     const handleSelectProject = (project) => {
-        setSelectedProject(project);
-        setSelectedSentence(null);
-        setNewSelection({ isActive: false, text: '', tag: '' });
-        setEditingTag({ isActive: false, _id: null, text: '', tag: '' });
-        setSearchTerm(''); // Clear search on project switch
-        setMatchedTag(null); // Clear tag match on project switch
-        isInitialLoad.current = true;
-        
-        if (project === null) {
-            setAllSentences([]);
-            setVisibleSentences([]);
-            setProjectName("No Project Selected");
-        } else {
-            const fullProject = projectTasks.find(p => p.project_name === project.project_name);
-            if (fullProject) {
-                setAllSentences(fullProject.sentences);
-                setVisibleSentences(fullProject.sentences);
-                setProjectName(fullProject.project_name);
-            }
+    setSelectedProject(project);
+    setSelectedSentence(null);
+    setNewSelection({ isActive: false, text: '', tag: '' });
+    setEditingTag({ isActive: false, _id: null, text: '', tag: '' });
+    setSearchTerm(''); // Clear search on project switch
+    setMatchedTag(null); // Clear tag match on project switch
+    isInitialLoad.current = true;
+    
+    // Log project selection
+    if (project) {
+        logUserAction(`Selected project: "${project.project_name}"`);
+    } else {
+        logUserAction('Deselected project');
+    }
+    
+    if (project === null) {
+        setAllSentences([]);
+        setVisibleSentences([]);
+        setProjectName("No Project Selected");
+    } else {
+        const fullProject = projectTasks.find(p => p.project_name === project.project_name);
+        if (fullProject) {
+            setAllSentences(fullProject.sentences);
+            setVisibleSentences(fullProject.sentences);
+            setProjectName(fullProject.project_name);
         }
-    };
+    }
+};
 
     const handleSelectionEvent = (sentence) => {
-        const highlightedText = window.getSelection().toString().trim();
-        setSelectedSentence(sentence);
-        setEditingTag({ isActive: false, _id: null, text: '', tag: '' });
+    const highlightedText = window.getSelection().toString().trim();
+    setSelectedSentence(sentence);
+    setEditingTag({ isActive: false, _id: null, text: '', tag: '' });
 
-        if (highlightedText.length > 0 && !editingSentence.isActive) {
-            let suggestion = "Noun Compound";
-            const lowerCaseText = highlightedText.toLowerCase();
-            const existingTag = tags.find(t => t.text.toLowerCase() === lowerCaseText);
+    // Log sentence selection
+    logUserAction(`Selected sentence for annotation`);
 
-            if (existingTag) {
-                suggestion = existingTag.tag;
-            }
-            
-            setNewSelection({ isActive: true, text: highlightedText, tag: suggestion });
-            
-            // Immediately check for auto-detected tags from current sentence
-            const autoDetectedTags = findAutoDetectedTags(sentence, highlightedText);
-            if (autoDetectedTags.length > 0) {
-                setTagRecommendations(autoDetectedTags);
-                setShowRecommendations(true);
-            }
-            
-            // Then fetch API recommendations
-            fetchTagRecommendations(highlightedText);
-        } else {
-            setNewSelection({ isActive: false, text: '', tag: '' });
-            setTagRecommendations([]);
-            setShowRecommendations(false);
+    if (highlightedText.length > 0 && !editingSentence.isActive) {
+        let suggestion = "Noun Compound";
+        const lowerCaseText = highlightedText.toLowerCase();
+        const existingTag = tags.find(t => t.text.toLowerCase() === lowerCaseText);
+
+        if (existingTag) {
+            suggestion = existingTag.tag;
         }
-    };
+        
+        setNewSelection({ isActive: true, text: highlightedText, tag: suggestion });
+        
+        // Immediately check for auto-detected tags from current sentence
+        const autoDetectedTags = findAutoDetectedTags(sentence, highlightedText);
+        if (autoDetectedTags.length > 0) {
+            setTagRecommendations(autoDetectedTags);
+            setShowRecommendations(true);
+        }
+        
+        // Then fetch API recommendations
+        fetchTagRecommendations(highlightedText);
+    } else {
+        setNewSelection({ isActive: false, text: '', tag: '' });
+        setTagRecommendations([]);
+        setShowRecommendations(false);
+    }
+};
 
     // Add this helper function
     const findAutoDetectedTags = (sentence, highlightedText) => {
@@ -481,53 +506,65 @@ export default function Dashboard() {
     };
 
     const handleSelectRecommendation = (recommendation) => {
-        setNewSelection(prev => ({
-            ...prev,
-            tag: recommendation.recommended_tag
-        }));
-        setShowRecommendations(false);
-    };
+    setNewSelection(prev => ({
+        ...prev,
+        tag: recommendation.recommended_tag
+    }));
+    setShowRecommendations(false);
+    
+    // Log recommendation selection
+    logUserAction(`Selected recommended tag: "${recommendation.recommended_tag}" for phrase: "${recommendation.phrase}"`);
+};
 
-    const handleSaveNewTag = async () => {
-        if (!selectedSentence || !newSelection.text.trim() || !newSelection.tag.trim()) {
-            return alert("Please provide both text and a tag label.");
+
+   const handleSaveNewTag = async () => {
+    if (!selectedSentence || !newSelection.text.trim() || !newSelection.tag.trim()) {
+        return alert("Please provide both text and a tag label.");
+    }
+    
+    const response = await fetchWithAuth(`http://127.0.0.1:5001/tags`, {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            username,
+            text: newSelection.text.trim(),
+            tag: newSelection.tag.trim(),
+            sentenceId: selectedSentence._id
+        }),
+    });
+    
+    if (!response) return; // Authentication failed
+    
+    // Log the tag creation action
+    await logUserAction(`Added tag: "${newSelection.text.trim()}" as "${newSelection.tag.trim()}" for sentence`);
+    
+    await fetchTags();
+    setNewSelection({ isActive: false, text: '', tag: '' });
+};
+    const handleRemoveTag = async (tagId) => {
+    if (!selectedSentence) return;
+    
+    // Get tag info before deletion for logging
+    const tagToRemove = currentSentenceTags.find(tag => tag._id === tagId);
+    
+    const response = await fetchWithAuth(`http://127.0.0.1:5001/api/tags/${tagId}`, { 
+        method: 'DELETE' 
+    });
+    
+    if (!response) return; // Authentication failed
+    
+    if (response.ok) {
+        // Log the tag removal action
+        if (tagToRemove) {
+            await logUserAction(`Removed tag: "${tagToRemove.text}" (${tagToRemove.tag}) from sentence`);
         }
-        
-        const response = await fetchWithAuth(`http://127.0.0.1:5001/tags`, {
-            method: 'POST',
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                username,
-                text: newSelection.text.trim(),
-                tag: newSelection.tag.trim(),
-                sentenceId: selectedSentence._id
-            }),
-        });
-        
-        if (!response) return; // Authentication failed
         
         await fetchTags();
-        setNewSelection({ isActive: false, text: '', tag: '' });
-    };
-
-    const handleRemoveTag = async (tagId) => {
-        if (!selectedSentence) return;
-        
-        const response = await fetchWithAuth(`http://127.0.0.1:5001/api/tags/${tagId}`, { 
-            method: 'DELETE' 
-        });
-        
-        if (!response) return; // Authentication failed
-        
-        if (response.ok) {
-            await fetchTags();
-            // Optional: Show success message
-            console.log("Tag removed successfully");
-        } else {
-            console.error('Failed to remove tag');
-            alert('Failed to remove tag. Please try again.');
-        }
-    };
+    } else {
+        console.error('Failed to remove tag');
+        alert('Failed to remove tag. Please try again.');
+    }
+};
 
 
     const handleStartEditTag = (tag) => {
@@ -537,75 +574,84 @@ export default function Dashboard() {
 
     
 
-     const handleUpdateTag = async () => {
-        if (!editingTag._id) return;
+     // Update the handleUpdateTag function
+const handleUpdateTag = async () => {
+    if (!editingTag._id) return;
 
-        // Local update for snappier UI
-        setTags(prevTags =>
-            prevTags.map(tag =>
-                tag._id === editingTag._id
-                    ? { ...tag, text: editingTag.text, tag: editingTag.tag }
-                    : tag
-            )
-        );
+    // Local update for snappier UI
+    setTags(prevTags =>
+        prevTags.map(tag =>
+            tag._id === editingTag._id
+                ? { ...tag, text: editingTag.text, tag: editingTag.tag }
+                : tag
+        )
+    );
 
-        try {
-            const response = await fetchWithAuth(`http://127.0.0.1:5001/tags`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    username,
-                    text: editingTag.text.trim(),
-                    tag: editingTag.tag.trim(),
-                    sentenceId: selectedSentence._id 
-                })
-            });
-            
-            if (!response) return; // Authentication failed
-            
-        } catch (err) {
-            console.error("Error updating tag:", err);
-        }
+    try {
+        const response = await fetchWithAuth(`http://127.0.0.1:5001/tags`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username,
+                text: editingTag.text.trim(),
+                tag: editingTag.tag.trim(),
+                sentenceId: selectedSentence._id 
+            })
+        });
+        
+        if (!response) return; // Authentication failed
+        
+        // Log the tag update action
+        await logUserAction(`Updated tag to: "${editingTag.text.trim()}" as "${editingTag.tag.trim()}"`);
+        
+    } catch (err) {
+        console.error("Error updating tag:", err);
+    }
 
-        setEditingTag({ isActive: false, _id: null, text: '', tag: '' });
-    };
+    setEditingTag({ isActive: false, _id: null, text: '', tag: '' });
+};
+
 
     const handleStatusChange = async (isAnnotated) => {
-        if (!selectedSentence) return;
+    if (!selectedSentence) return;
 
-        // Optimistic UI Update (keep this)
-        const updatedAllSentences = allSentences.map(s =>
-            s._id === selectedSentence._id ? { ...s, is_annotated: isAnnotated } : s
-        );
-        setAllSentences(updatedAllSentences);
-        setSelectedSentence({ ...selectedSentence, is_annotated: isAnnotated });
+    // Optimistic UI Update
+    const updatedAllSentences = allSentences.map(s =>
+        s._id === selectedSentence._id ? { ...s, is_annotated: isAnnotated } : s
+    );
+    setAllSentences(updatedAllSentences);
+    setSelectedSentence({ ...selectedSentence, is_annotated: isAnnotated });
 
-        try {
-            const response = await fetchWithAuth(`http://127.0.0.1:5001/sentences/${selectedSentence._id}/status`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ is_annotated: isAnnotated, username }),
-            });
+    try {
+        const response = await fetchWithAuth(`http://127.0.0.1:5001/sentences/${selectedSentence._id}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_annotated: isAnnotated, username }),
+        });
 
-            if (!response) return; // Authentication failed
+        if (!response) return; // Authentication failed
 
-            if (!response.ok) {
-                const errorBody = await response.json().catch(() => ({ error: 'No JSON body available' }));
-                console.error(`Status Update Failed: ${response.status}`, errorBody);
-                throw new Error(errorBody.error || `Server Error (${response.status})`);
-            }
-            
-            // Success: reload tasks to update metrics
-            await loadAllUserTasks(false); 
-
-        } catch (err) {
-            console.error("Final Error in Status Update:", err);
-            alert(`Failed to update status. Reason: ${err.message}. Check console.`);
-            
-            // Revert UI changes and fetch correct data state if update failed
-            await loadAllUserTasks(false);
+        if (!response.ok) {
+            const errorBody = await response.json().catch(() => ({ error: 'No JSON body available' }));
+            console.error(`Status Update Failed: ${response.status}`, errorBody);
+            throw new Error(errorBody.error || `Server Error (${response.status})`);
         }
-    };
+        
+        // Log the status change action
+        await logUserAction(`Marked sentence as ${isAnnotated ? 'annotated' : 'not annotated'}`);
+        
+        // Success: reload tasks to update metrics
+        await loadAllUserTasks(false); 
+
+    } catch (err) {
+        console.error("Final Error in Status Update:", err);
+        alert(`Failed to update status. Reason: ${err.message}. Check console.`);
+        
+        // Revert UI changes and fetch correct data state if update failed
+        await loadAllUserTasks(false);
+    }
+};
+
 
     const handleLogout = async () => {
         try {

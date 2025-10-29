@@ -32,61 +32,85 @@ export default function UserLogbook() {
     const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
     // Fetch user sessions and statistics
-    const fetchUserLogs = async () => {
-        setIsLoading(true);
-        try {
-            const [sessionsResponse, usersResponse] = await Promise.all([
-                fetch(`http://127.0.0.1:5001/api/activity-logs/${username}`, {
-                    headers: getAuthHeaders()
-                }),
-                fetch('http://127.0.0.1:5001/api/users-list', {
-                    headers: getAuthHeaders()
-                })
-            ]);
+    // In UserLogBook.js - Update the fetchUserLogs function
+const fetchUserLogs = async () => {
+    setIsLoading(true);
+    try {
+        const [sessionsResponse, usersResponse] = await Promise.all([
+            fetch(`http://127.0.0.1:5001/api/activity-logs/${username}`, {
+                headers: getAuthHeaders()
+            }),
+            // Include ALL users (including reviewers) in the filter
+            fetch('http://127.0.0.1:5001/api/users-list', {
+                headers: getAuthHeaders()
+            })
+        ]);
 
-            if (sessionsResponse.ok) {
-                const sessionsData = await sessionsResponse.json();
-                setUserSessions(sessionsData);
-                setFilteredSessions(sessionsData);
-                
-                // Calculate user statistics
-                calculateUserStats(sessionsData);
-            }
-
-            if (usersResponse.ok) {
-                const usersData = await usersResponse.json();
-                setUsersList(usersData);
-            }
-
-        } catch (error) {
-            console.error('Error fetching user logs:', error);
-        } finally {
-            setIsLoading(false);
+        if (sessionsResponse.ok) {
+            const sessionsData = await sessionsResponse.json();
+            setUserSessions(sessionsData);
+            setFilteredSessions(sessionsData);
+            
+            // Calculate user statistics
+            calculateUserStats(sessionsData);
         }
+
+        if (usersResponse.ok) {
+            const usersData = await usersResponse.json();
+            // Include all users (annotators and reviewers)
+            setUsersList(usersData);
+        }
+
+    } catch (error) {
+        console.error('Error fetching user logs:', error);
+    } finally {
+        setIsLoading(false);
+    }
+};
+
+    // In UserLogBook.js - Replace the calculateUserStats function
+const calculateUserStats = (sessions) => {
+    const stats = {
+        totalUsers: new Set(sessions.map(s => s.username)).size,
+        totalSessions: sessions.length,
+        totalAnnotations: 0,
+        totalTags: 0,
+        averageSessionTime: 0,
+        userBreakdown: {}
     };
 
-    // In UserLogBook.js - Fix the calculateUserStats function
-    const calculateUserStats = (sessions) => {
-        const stats = {
-            totalUsers: new Set(sessions.map(s => s.username)).size,
-            totalSessions: sessions.length,
-            totalAnnotations: 0,
-            totalTags: 0,
-            averageSessionTime: 0,
-            userBreakdown: {}
-        };
+    const userData = {};
 
-        const userData = {};
-
-        sessions.forEach(session => {
-            // Skip sessions that only have "Session ended with no tasks"
-            const hasRealTasks = session.tasksDone && session.tasksDone.some(task => 
-                task !== "Session ended with no tasks" && 
-                task !== "Active session - no tasks recorded"
-            );
+    sessions.forEach(session => {
+        // ENHANCED: Include reviewer sessions and sessions with meaningful activities
+        const hasRealTasks = session.tasksDone && session.tasksDone.some(task => {
+            // Skip placeholder tasks
+            if (task === "Session ended with no tasks" || 
+                task === "Active session - no tasks recorded") {
+                return false;
+            }
             
-            if (!hasRealTasks) return; // Skip this session
-
+            // Include reviewer activities (review, approve, reject actions)
+            if (task.toLowerCase().includes('review') || 
+                task.toLowerCase().includes('approve') || 
+                task.toLowerCase().includes('reject')) {
+                return true;
+            }
+            
+            // Include annotation activities
+            if (task.toLowerCase().includes('annotat') || 
+                task.toLowerCase().includes('tag') ||
+                task.toLowerCase().includes('mwe') ||
+                task.toLowerCase().includes('phrase')) {
+                return true;
+            }
+            
+            return false;
+        });
+        
+        // If no real tasks found, skip this session for detailed stats but count the user
+        if (!hasRealTasks) {
+            // Still count the user for total users
             const user = session.username;
             if (!userData[user]) {
                 userData[user] = {
@@ -97,57 +121,81 @@ export default function UserLogbook() {
                     tasksCompleted: []
                 };
             }
-
-            userData[user].sessions++;
-            
-            // Calculate session duration
-            if (session.loginTimeIST && session.logoutTimeIST) {
-                const loginTime = parseISTDate(session.loginTimeIST);
-                const logoutTime = parseISTDate(session.logoutTimeIST);
-                const duration = (logoutTime - loginTime) / (1000 * 60); // minutes
-                userData[user].totalSessionTime += duration;
-            }
-
-            // Analyze tasks for annotations and tags - IMPROVED DETECTION
-            session.tasksDone?.forEach(task => {
-                if (task === "Session ended with no tasks" || 
-                    task === "Active session - no tasks recorded") {
-                    return; // Skip these placeholder tasks
-                }
-
-                // Enhanced annotation detection
-                if (task.toLowerCase().includes('annotat') || 
-                    task.toLowerCase().includes('tag') ||
-                    task.toLowerCase().includes('mwe') ||
-                    task.toLowerCase().includes('phrase')) {
-                    
-                    if (task.toLowerCase().includes('annotat')) {
-                        userData[user].annotations++;
-                        stats.totalAnnotations++;
-                    }
-                    if (task.toLowerCase().includes('tag')) {
-                        userData[user].tags++;
-                        stats.totalTags++;
-                    }
-                    
-                    // Track unique tasks
-                    if (!userData[user].tasksCompleted.includes(task)) {
-                        userData[user].tasksCompleted.push(task);
-                    }
-                }
-            });
-        });
-
-        // Calculate averages only for sessions with real tasks
-        const sessionsWithRealTasks = Object.values(userData).reduce((sum, user) => sum + user.sessions, 0);
-        if (sessionsWithRealTasks > 0) {
-            const totalTime = Object.values(userData).reduce((sum, user) => sum + user.totalSessionTime, 0);
-            stats.averageSessionTime = totalTime / sessionsWithRealTasks;
+            return; // Skip detailed counting but user is still in totalUsers
         }
 
-        stats.userBreakdown = userData;
-        setUserStats(stats);
-    };
+        const user = session.username;
+        if (!userData[user]) {
+            userData[user] = {
+                sessions: 0,
+                totalSessionTime: 0,
+                annotations: 0,
+                tags: 0,
+                tasksCompleted: []
+            };
+        }
+
+        userData[user].sessions++;
+        
+        // Calculate session duration
+        if (session.loginTimeIST && session.logoutTimeIST) {
+            const loginTime = parseISTDate(session.loginTimeIST);
+            const logoutTime = parseISTDate(session.logoutTimeIST);
+            const duration = (logoutTime - loginTime) / (1000 * 60); // minutes
+            userData[user].totalSessionTime += duration;
+        }
+
+        // Enhanced task analysis for both annotators and reviewers
+        session.tasksDone?.forEach(task => {
+            if (task === "Session ended with no tasks" || 
+                task === "Active session - no tasks recorded") {
+                return; // Skip placeholder tasks
+            }
+
+            // Track reviewer activities
+            if (task.toLowerCase().includes('review') || 
+                task.toLowerCase().includes('approve') || 
+                task.toLowerCase().includes('reject')) {
+                // Count these as meaningful activities but not as annotations/tags
+                if (!userData[user].tasksCompleted.includes(task)) {
+                    userData[user].tasksCompleted.push(task);
+                }
+                return;
+            }
+
+            // Track annotation activities
+            if (task.toLowerCase().includes('annotat') || 
+                task.toLowerCase().includes('tag') ||
+                task.toLowerCase().includes('mwe') ||
+                task.toLowerCase().includes('phrase')) {
+                
+                if (task.toLowerCase().includes('annotat')) {
+                    userData[user].annotations++;
+                    stats.totalAnnotations++;
+                }
+                if (task.toLowerCase().includes('tag')) {
+                    userData[user].tags++;
+                    stats.totalTags++;
+                }
+                
+                // Track unique tasks
+                if (!userData[user].tasksCompleted.includes(task)) {
+                    userData[user].tasksCompleted.push(task);
+                }
+            }
+        });
+    });
+
+    // Calculate averages only for sessions with real tasks
+    const sessionsWithRealTasks = Object.values(userData).reduce((sum, user) => sum + user.sessions, 0);
+    if (sessionsWithRealTasks > 0) {
+        const totalTime = Object.values(userData).reduce((sum, user) => sum + user.totalSessionTime, 0);
+        stats.averageSessionTime = totalTime / sessionsWithRealTasks;
+    }
+
+    stats.userBreakdown = userData;
+    setUserStats(stats);
+};
 
     // Parse IST date string to Date object
     const parseISTDate = (dateString) => {
