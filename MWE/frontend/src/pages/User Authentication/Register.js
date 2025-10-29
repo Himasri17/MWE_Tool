@@ -170,13 +170,13 @@ export default function Register() {
                             disabled={isLoading}
                         />
                         
-                        <FormControl fullWidth margin="normal" sx={{ mb: 2 }}>
-                            <InputLabel id="languages-label">Select Languages (Optional)</InputLabel>
+                        <FormControl fullWidth margin="normal" required sx={{ mb: 2 }}>
+                            <InputLabel id="languages-label">Select Languages</InputLabel>
                             <Select 
                                 labelId="languages-label" 
                                 value={languages} 
                                 onChange={(e) => setLanguages(e.target.value)} 
-                                label="Select Languages (Optional)"
+                                label="Select Languages"
                                 startAdornment={<InputAdornment position="start"><LanguageIcon color="action" /></InputAdornment>}
                                 disabled={isLoading}
                             >
