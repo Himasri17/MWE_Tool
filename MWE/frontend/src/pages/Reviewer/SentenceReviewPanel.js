@@ -42,7 +42,30 @@ export default function SentenceReviewPanel() {
     const handleCloseSnackbar = () => { 
         setSnackbar({ ...snackbar, open: false });
     };
-    
+
+    // --- Logging Function ---
+    const logReviewerAction = async (actionDescription) => {
+        try {
+            const token = getToken();
+            const response = await fetch('http://127.0.0.1:5001/api/log-action', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    username: username,
+                    description: actionDescription
+                })
+            });
+            
+            if (!response.ok) {
+                console.error('Failed to log action');
+            }
+        } catch (error) {
+            console.error('Failed to log action:', error);
+        }
+    };
     
     // --- Data Fetching (Using useCallback) ---
     const fetchSentencesForReview = useCallback(async (showLoading = true) => {
@@ -51,7 +74,12 @@ export default function SentenceReviewPanel() {
         setDebugInfo(null);
         
         try {
-            const response = await fetch(`http://127.0.0.1:5001/api/projects/${projectId}/sentences?username=${targetUsername}`);
+            const token = getToken();
+            const response = await fetch(`http://127.0.0.1:5001/api/projects/${projectId}/sentences?username=${targetUsername}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
             
             if (!response.ok) {
                 const errorData = await response.json();
@@ -73,7 +101,10 @@ export default function SentenceReviewPanel() {
             setSentences(filteredSentences || []);
             setProjectName(data.project_name || `Project ${projectId}`);
 
-            if (!showLoading) { showSnackbar(`Refreshed! ${totalSentences} sentences for ${targetUsername}`, 'success'); }
+            if (!showLoading) { 
+                showSnackbar(`Refreshed! ${totalSentences} sentences for ${targetUsername}`, 'success');
+                await logReviewerAction(`Refreshed review panel for user: ${targetUsername}`);
+            }
 
         } catch (error) {
             console.error("❌ Review Load Error:", error);
@@ -83,53 +114,13 @@ export default function SentenceReviewPanel() {
         } finally {
             setIsLoading(false);
         }
-    }, [projectId, targetUsername]); 
+    }, [projectId, targetUsername, username]); 
 
     useEffect(() => {
         fetchSentencesForReview();
+        // Log panel access
+        logReviewerAction(`Accessed review panel for project: ${projectId}, user: ${targetUsername}`);
     }, [fetchSentencesForReview]);
-
-   
-
-    const updateSentenceStatus = useCallback((sentenceId) => {
-        // This function is less critical now that we rely on full refresh, 
-        // but it maintains local state consistency if needed.
-        setSentences(prevSentences => prevSentences.map(s => {
-            if (s._id === sentenceId) {
-                const hasPendingTags = s.tags.some(tag => tag.review_status === 'Pending');
-                const hasApprovedTags = s.tags.some(tag => tag.review_status === 'Approved');
-                
-                let newReviewStatus = s.review_status || 'Pending';
-                let newIsAnnotated = s.is_annotated;
-                
-                if (hasPendingTags) {
-                    newReviewStatus = 'Pending';
-                    newIsAnnotated = true;
-                } else if (hasApprovedTags) {
-                    newReviewStatus = 'Approved';
-                    newIsAnnotated = true;
-                } else if (newIsAnnotated) {
-                    newReviewStatus = (newReviewStatus === 'Approved') ? 'Approved' : 'Rejected';
-                } else {
-                    newReviewStatus = 'Pending';
-                    newIsAnnotated = false;
-                }
-                
-                const updatedSentence = { 
-                    ...s, 
-                    review_status: newReviewStatus,
-                    is_annotated: newIsAnnotated
-                };
-                
-                if (selectedSentenceData && selectedSentenceData._id === sentenceId) {
-                    setSelectedSentenceData(updatedSentence);
-                }
-                
-                return updatedSentence;
-            }
-            return s;
-        }));
-    }, [selectedSentenceData]);
 
     const handleUndoApproval = async (tagId, tagText) => {
         if (!selectedSentenceData) return;
@@ -139,9 +130,13 @@ export default function SentenceReviewPanel() {
         setIsReviewSubmitting(true);
 
         try {
+            const token = getToken();
             const response = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ 
                     reviewerUsername: username 
                 }), 
@@ -154,6 +149,9 @@ export default function SentenceReviewPanel() {
             }
 
             showSnackbar(`Tag '${tagText}' approval undone successfully.`, 'success');
+            
+            // Log the action
+            await logReviewerAction(`Undid approval of tag: "${tagText}" for user: ${targetUsername}`);
             
             // Refresh the data
             setSelectedSentenceData(null);
@@ -175,9 +173,13 @@ export default function SentenceReviewPanel() {
         setIsReviewSubmitting(true);
 
         try {
+            const token = getToken();
             const response = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ 
                     reviewerUsername: username 
                 }), 
@@ -190,6 +192,9 @@ export default function SentenceReviewPanel() {
             }
 
             showSnackbar(`Tag '${tagText}' rejection undone successfully.`, 'success');
+            
+            // Log the action
+            await logReviewerAction(`Undid rejection of tag: "${tagText}" for user: ${targetUsername}`);
             
             // Refresh the data
             setSelectedSentenceData(null);
@@ -217,6 +222,7 @@ export default function SentenceReviewPanel() {
         setIsReviewSubmitting(true);
 
         try {
+            const token = getToken();
             const method = action === 'Approve' ? 'PUT' : 'DELETE'; 
             
             const bodyData = { 
@@ -226,7 +232,10 @@ export default function SentenceReviewPanel() {
             
             const response = await fetch(url, {
                 method: method,
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify(bodyData), 
             });
 
@@ -238,13 +247,12 @@ export default function SentenceReviewPanel() {
 
             showSnackbar(`Tag '${tagText}' successfully ${action}d.`, 'success');
             
-            // --- AUTO-REFRESH INTEGRATION START (for tag review) ---
-            // 1. Clear selected sentence data
-            setSelectedSentenceData(null); 
-
-            // 2. Fetch the entire sentence list again (false for no loading spinner)
+            // Log the action
+            await logReviewerAction(`${action}d tag: "${tagText}" for user: ${targetUsername}. Comments: ${currentComment.trim()}`);
+            
+            // Refresh the data
+            setSelectedSentenceData(null);
             await fetchSentencesForReview(false);
-            // --- AUTO-REFRESH INTEGRATION END ---
             
             // Clear the comment field for the tag
             setTagComments(prev => { delete prev[tagId]; return { ...prev }; });
@@ -257,8 +265,6 @@ export default function SentenceReviewPanel() {
         }
     };
 
-        // Add these new handler functions after your existing handlers
-
     const handleSentenceApprove = async () => {
         if (!selectedSentenceData) return;
         
@@ -267,9 +273,13 @@ export default function SentenceReviewPanel() {
         setIsReviewSubmitting(true);
 
         try {
+            const token = getToken();
             const response = await fetch(url, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ 
                     reviewerUsername: username,
                     comments: reviewComments.trim()
@@ -283,6 +293,9 @@ export default function SentenceReviewPanel() {
             }
 
             showSnackbar(`Sentence approved successfully. ${data.approved_tags_count || 0} tags auto-approved.`, 'success');
+            
+            // Log the action
+            await logReviewerAction(`Approved sentence for user: ${targetUsername}. ${data.approved_tags_count || 0} tags approved. Comments: ${reviewComments.trim()}`);
             
             // Refresh the data
             setSelectedSentenceData(null);
@@ -311,9 +324,13 @@ export default function SentenceReviewPanel() {
         setIsReviewSubmitting(true);
 
         try {
+            const token = getToken();
             const response = await fetch(url, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ 
                     reviewerUsername: username,
                     comments: reviewComments.trim()
@@ -327,6 +344,9 @@ export default function SentenceReviewPanel() {
             }
 
             showSnackbar(`Sentence rejected successfully. ${data.rejected_tags_count || 0} tags auto-rejected.`, 'success');
+            
+            // Log the action
+            await logReviewerAction(`Rejected sentence for user: ${targetUsername}. ${data.rejected_tags_count || 0} tags rejected. Comments: ${reviewComments.trim()}`);
             
             // Refresh the data
             setSelectedSentenceData(null);
@@ -349,9 +369,13 @@ export default function SentenceReviewPanel() {
         setIsReviewSubmitting(true);
 
         try {
+            const token = getToken();
             const response = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ 
                     reviewerUsername: username 
                 }), 
@@ -365,6 +389,9 @@ export default function SentenceReviewPanel() {
 
             showSnackbar(`Sentence review undone successfully. ${data.reset_tags_count || 0} tags reset to pending.`, 'success');
             
+            // Log the action
+            await logReviewerAction(`Undid sentence review for user: ${targetUsername}. ${data.reset_tags_count || 0} tags reset to pending`);
+            
             // Refresh the data
             setSelectedSentenceData(null);
             setReviewComments('');
@@ -377,10 +404,11 @@ export default function SentenceReviewPanel() {
             setIsReviewSubmitting(false);
         }
     };
+
     // --- Handlers ---
     const handleLogout = async () => { 
         try {
-            const token = getToken(); // Use getToken from authUtils
+            const token = getToken();
             const reviewerEmail = localStorage.getItem('username');
             
             console.log('🔐 Logout Debug - Before API call:', { 
@@ -389,6 +417,9 @@ export default function SentenceReviewPanel() {
             });
 
             if (token && reviewerEmail) {
+                // Log logout action
+                await logReviewerAction("Logged out from review panel");
+                
                 const response = await fetch('http://127.0.0.1:5001/logout', {
                     method: "POST",
                     headers: { 
@@ -419,27 +450,46 @@ export default function SentenceReviewPanel() {
             console.error('❌ Logout error:', error);
         } finally {
             localStorage.removeItem('username');
-            removeToken(); // Use the function from authUtils
+            removeToken();
             navigate("/login");
         }
     };
-    const handleBack = () => { navigate(`/reviewer/dashboard`); };
-    const handleRefresh = () => { fetchSentencesForReview(false); setSelectedSentenceData(null); };
+
+    const handleBack = () => { 
+        // Log navigation back
+        logReviewerAction("Navigated back to reviewer dashboard");
+        navigate(`/reviewer/dashboard`); 
+    };
+
+    const handleRefresh = () => { 
+        fetchSentencesForReview(false); 
+        setSelectedSentenceData(null); 
+    };
 
     const handleSentenceClick = (sentenceData) => {
         setSelectedSentenceData(sentenceData);
         // Load existing comments from the SENTENCE if available
-        setReviewComments(sentenceData.review_comments || ''); 
+        setReviewComments(sentenceData.review_comments || '');
+        
+        // Log sentence selection
+        logReviewerAction(`Selected sentence for detailed review: "${sentenceData.textContent?.substring(0, 50)}..."`);
     };
     
-    // --- Pagination Logic (UNCHANGED) ---
+    // --- Pagination Logic ---
     const totalPages = Math.ceil(sentences.length / sentencesPerPage);
     const indexOfLastSentence = currentPage * sentencesPerPage;
     const indexOfFirstSentence = indexOfLastSentence - sentencesPerPage;
     const currentSentences = sentences.slice(indexOfFirstSentence, indexOfLastSentence);
     
-    const handleNextPage = () => { setCurrentPage(prev => Math.min(prev + 1, totalPages)); };
-    const handlePrevPage = () => { setCurrentPage(prev => Math.max(prev - 1, 1)); };
+    const handleNextPage = () => { 
+        setCurrentPage(prev => Math.min(prev + 1, totalPages));
+        logReviewerAction(`Navigated to page ${Math.min(currentPage + 1, totalPages)}`);
+    };
+    
+    const handlePrevPage = () => { 
+        setCurrentPage(prev => Math.max(prev - 1, 1));
+        logReviewerAction(`Navigated to page ${Math.max(currentPage - 1, 1)}`);
+    };
 
     const renderAnnotationView = (sentenceData) => {
         if (!sentenceData) return <Alert severity="info">No sentence selected.</Alert>;
@@ -932,7 +982,6 @@ export default function SentenceReviewPanel() {
             </Paper>
         );
     };
-    // --- END UPDATED LOGIC ---
 
     if (isLoading) {
         return (
